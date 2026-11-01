@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist gettext-domain="music-control-equalizer">
+  <schema id="org.gnome.shell.extensions.music-control-equalizer"
+          path="/org/gnome/shell/extensions/music-control-equalizer/">
+
+    <key name="equalizer-enabled" type="b">
+      <default>true</default>
+      <summary>Enable system-wide PipeWire equalizer</summary>
+      <description>Whether the real-time PipeWire filter-chain equalizer backend is active.</description>
+    </key>
+
+    <key name="active-preset" type="s">
+      <default>'flat'</default>
+      <summary>Active equalizer preset ID</summary>
+      <description>Identifier of the currently selected equalizer preset.</description>
+    </key>
+
+    <key name="band-gains" type="ad">
+      <default>[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]</default>
+      <summary>10-band equalizer gain values in dB</summary>
+      <description>Gain values in dB (-12.0 to +12.0) for 32Hz, 64Hz, 125Hz, 250Hz, 500Hz, 1kHz, 2kHz, 4kHz, 8kHz, and 16kHz.</description>
+    </key>
+
+    <key name="bass-gain" type="d">
+      <default>0.0</default>
+      <range min="-12.0" max="12.0"/>
+      <summary>Bass boost/cut gain in dB</summary>
+      <description>Low-shelf biquad filter gain at 100Hz in dB (-12.0 to +12.0).</description>
+    </key>
+
+    <key name="treble-gain" type="d">
+      <default>0.0</default>
+      <range min="-12.0" max="12.0"/>
+      <summary>Treble boost/cut gain in dB</summary>
+      <description>High-shelf biquad filter gain at 10kHz in dB (-12.0 to +12.0).</description>
+    </key>
+
+    <key name="custom-presets" type="s">
+      <default>'{}'</default>
+      <summary>User-defined custom presets JSON</summary>
+      <description>JSON object mapping custom preset IDs to their name, 10 band gains, bass gain, and treble gain.</description>
+    </key>
+
+    <key name="preferred-player" type="s">
+      <default>''</default>
+      <summary>Preferred MPRIS player bus name</summary>
+      <description>The D-Bus name of the user's last selected MPRIS media player.</description>
+    </key>
+
+    <key name="show-remaining-time" type="b">
+      <default>true</default>
+      <summary>Show remaining track duration</summary>
+      <description>If true, displays remaining track time (-MM:SS); otherwise displays total track duration (MM:SS).</description>
+    </key>
+
+    <key name="show-track-in-panel" type="b">
+      <default>false</default>
+      <summary>Show current track title in Top Bar</summary>
+      <description>Whether to display the currently playing track title next to the Top Bar icon.</description>
+    </key>
+
+    <key name="panel-position" type="s">
+      <default>'right'</default>
+      <summary>Top Bar indicator position</summary>
+      <description>Where to place the indicator on the GNOME Top Bar: left, center, or right.</description>
+    </key>
+
+  </schema>
+</schemalist>
