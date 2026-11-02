@@ -95,15 +95,15 @@ wpctl status
    glib-compile-schemas schemas/
    ```
 
-2. Copy or symlink the extension to `~/.local/share/gnome-shell/extensions/music-control-equalizer@kaz.linux`:
+2. Copy or symlink the extension to `~/.local/share/gnome-shell/extensions/music_control_equalizer@kaz`:
    ```bash
    mkdir -p ~/.local/share/gnome-shell/extensions
-   ln -sfn "$(pwd)" ~/.local/share/gnome-shell/extensions/music-control-equalizer@kaz.linux
+   ln -sfn "$(pwd)" ~/.local/share/gnome-shell/extensions/music_control_equalizer@kaz
    ```
 
 3. Enable the extension:
    ```bash
-   gnome-extensions enable music-control-equalizer@kaz.linux
+   gnome-extensions enable music_control_equalizer@kaz
    ```
    *(Note: If GNOME Shell has not yet scanned the newly added extension directory, log out and log back in, or use Option B below to install from a packed ZIP bundle via D-Bus).*
 
@@ -123,13 +123,13 @@ gnome-extensions pack . \
   --schema=schemas/org.gnome.shell.extensions.music-control-equalizer.gschema.xml
 ```
 
-This generates `music-control-equalizer@kaz.linux.shell-extension.zip`.
+This generates `music_control_equalizer@kaz.shell-extension.zip`.
 
 To install the ZIP package directly:
 
 ```bash
-gnome-extensions install --force music-control-equalizer@kaz.linux.shell-extension.zip
-gnome-extensions enable music-control-equalizer@kaz.linux
+gnome-extensions install --force music_control_equalizer@kaz.shell-extension.zip
+gnome-extensions enable music_control_equalizer@kaz
 ```
 
 ---

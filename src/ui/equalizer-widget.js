@@ -8,7 +8,7 @@ import St from 'gi://St';
 
 import {BaseSlider, HorizontalSlider} from './volume-widget.js';
 import {BackendStatus} from '../audio/pipewire.js';
-import {roundToStep, formatDb} from '../utils/helpers.js';
+import {roundToStep, formatDb, parseAccentColor} from '../utils/helpers.js';
 
 const TAU = Math.PI * 2;
 
@@ -87,7 +87,7 @@ class VerticalBandSlider extends BaseSlider {
         cr.setSourceRGBA(1.0, 1.0, 1.0, 0.13);
         cr.fill();
 
-        // 3. Electric blue active fill from bottom up to handleY (matching reference image)
+        // 3. Dynamic Accent Active fill from bottom up to handleY
         const fillHeight = Math.max(0, m.trackBottom - handleY);
         if (fillHeight > 0.5) {
             this._drawRoundedBar(
@@ -98,7 +98,7 @@ class VerticalBandSlider extends BaseSlider {
                 fillHeight,
                 trackRadius
             );
-            cr.setSourceRGBA(0.145, 0.494, 0.976, 1.0);
+            cr.setSourceRGBA(this._accent.r, this._accent.g, this._accent.b, 1.0);
             cr.fill();
         }
 
@@ -109,7 +109,7 @@ class VerticalBandSlider extends BaseSlider {
 
         if (this.hover || this._dragging) {
             cr.arc(centerX, handleY, radius + 3.0, 0, TAU);
-            cr.setSourceRGBA(0.145, 0.494, 0.976, 0.30);
+            cr.setSourceRGBA(this._accent.r, this._accent.g, this._accent.b, 0.30);
             cr.fill();
         }
 
@@ -134,10 +134,14 @@ export class EqualizerWidget {
     /**
      * @param {import('../audio/equalizer.js').EqualizerManager} equalizerManager
      * @param {string} extensionPath
+     * @param {import('../utils/settings.js').SettingsManager} [settings=null]
+     * @param {Function} [onOpenSettings=null]
      */
-    constructor(equalizerManager, extensionPath) {
+    constructor(equalizerManager, extensionPath, settings = null, onOpenSettings = null) {
         this._eq = equalizerManager;
         this._extensionPath = extensionPath;
+        this._settings = settings;
+        this._onOpenSettings = onOpenSettings;
         this._bandWidgets = [];
         this._destroyed = false;
 
@@ -145,6 +149,7 @@ export class EqualizerWidget {
             style_class: 'mce-eq-card',
             orientation: Clutter.Orientation.VERTICAL,
             x_expand: true,
+            y_expand: true,
         });
 
         this._buildHeaderRow();
@@ -156,12 +161,20 @@ export class EqualizerWidget {
 
         this._bindSignals();
         this._syncAll();
+        this.syncInterfaceSettings();
     }
 
     _buildHeaderRow() {
         this._headerRow = new St.BoxLayout({
             style_class: 'mce-eq-header',
             x_expand: true,
+            y_align: Clutter.ActorAlign.CENTER,
+        });
+
+        // 0. Equalizer Section Title
+        this._eqTitleLabel = new St.Label({
+            text: 'Equalizer',
+            style_class: 'mce-eq-title-label',
             y_align: Clutter.ActorAlign.CENTER,
         });
 
@@ -219,7 +232,7 @@ export class EqualizerWidget {
         // Spacer
         const spacer = new St.Widget({x_expand: true});
 
-        // 3. Real-time DSP Active/Bypass Pill
+        // 3. Real-time DSP Active/Bypass Pill (EQ ON/OFF)
         this._dspToggleBtn = new St.Button({
             style_class: 'mce-dsp-badge active',
             can_focus: true,
@@ -234,7 +247,7 @@ export class EqualizerWidget {
             this._eq.enabled = !this._eq.enabled;
         });
 
-        // 4. Reset Button (Top-right circular/rounded-square refresh icon matching screenshot)
+        // 4. Reset Button
         this._resetButton = new St.Button({
             style_class: 'mce-eq-reset-button',
             can_focus: true,
@@ -248,11 +261,28 @@ export class EqualizerWidget {
             this._eq.reset();
         });
 
+        // 5. Advanced Settings Button (opens Extension Preferences / Interface Customization)
+        this._advancedSettingsButton = new St.Button({
+            style_class: 'mce-eq-action-button mce-eq-settings-button',
+            can_focus: true,
+            y_align: Clutter.ActorAlign.CENTER,
+        });
+        this._advancedSettingsButton.set_child(new St.Icon({
+            icon_name: 'emblem-system-symbolic',
+            icon_size: 13,
+        }));
+        this._advancedSettingsButton.connect('clicked', () => {
+            if (typeof this._onOpenSettings === 'function')
+                this._onOpenSettings();
+        });
+
+        this._headerRow.add_child(this._eqTitleLabel);
         this._headerRow.add_child(this._presetButton);
         this._headerRow.add_child(this._savePresetToggleBtn);
         this._headerRow.add_child(spacer);
         this._headerRow.add_child(this._dspToggleBtn);
         this._headerRow.add_child(this._resetButton);
+        this._headerRow.add_child(this._advancedSettingsButton);
 
         this.actor.add_child(this._headerRow);
     }
@@ -428,10 +458,14 @@ export class EqualizerWidget {
                 if (this._destroyed)
                     return;
                 dbLabel.text = this._formatBandDbShort(val);
-                if (Math.abs(val) >= 0.1)
+                if (Math.abs(val) >= 0.1) {
                     dbLabel.add_style_class_name('non-zero');
-                else
+                    if (this._settings)
+                        dbLabel.style = `color: ${this._settings.accentColor};`;
+                } else {
                     dbLabel.remove_style_class_name('non-zero');
+                    dbLabel.style = null;
+                }
 
                 this._eq.setBandGain(i, val, committed);
             });
@@ -456,11 +490,11 @@ export class EqualizerWidget {
 
     _buildBassTrebleRow() {
         // Horizontal separator line above Bass & Treble
-        const divider = new St.Widget({
+        this._toneDivider = new St.Widget({
             style_class: 'mce-eq-horizontal-divider',
             x_expand: true,
         });
-        this.actor.add_child(divider);
+        this.actor.add_child(this._toneDivider);
 
         this._toneRow = new St.BoxLayout({
             style_class: 'mce-tone-row',
@@ -695,7 +729,18 @@ export class EqualizerWidget {
             this._dspToggleLabel.text = status === BackendStatus.STARTING ? 'EQ…' : 'EQ ON';
         } else {
             this._dspToggleBtn.remove_style_class_name('active');
-            this._dspToggleLabel.text = 'BYPASS';
+            this._dspToggleLabel.text = 'EQ OFF';
+        }
+
+        if (this._settings && this._dspToggleBtn) {
+            const accent = parseAccentColor(this._settings.accentColor);
+            if (this._eq.enabled) {
+                this._dspToggleBtn.style = `background-color: ${accent.rgba(0.20)}; border-color: ${accent.rgba(0.45)};`;
+                this._dspToggleLabel.style = `color: ${accent.hex};`;
+            } else {
+                this._dspToggleBtn.style = null;
+                this._dspToggleLabel.style = null;
+            }
         }
     }
 
@@ -713,10 +758,14 @@ export class EqualizerWidget {
             if (!slider.isDragging)
                 slider.value = val;
             dbLabel.text = this._formatBandDbShort(val);
-            if (Math.abs(val) >= 0.1)
+            if (Math.abs(val) >= 0.1) {
                 dbLabel.add_style_class_name('non-zero');
-            else
+                if (this._settings)
+                    dbLabel.style = `color: ${this._settings.accentColor};`;
+            } else {
                 dbLabel.remove_style_class_name('non-zero');
+                dbLabel.style = null;
+            }
         }
 
         const bass = this._eq.bassGain;
@@ -735,6 +784,53 @@ export class EqualizerWidget {
             return;
         this._presetDrawer.visible = false;
         this._saveRow.visible = false;
+    }
+
+    syncInterfaceSettings() {
+        if (this._destroyed || !this.actor || !this._settings)
+            return;
+
+        const showBassTreble = this._settings.showBassTreble;
+        if (this._toneDivider)
+            this._toneDivider.visible = showBassTreble;
+        if (this._toneRow)
+            this._toneRow.visible = showBassTreble;
+
+        const hex = this._settings.accentColor;
+        const accent = parseAccentColor(hex);
+
+        for (const {slider, dbLabel} of this._bandWidgets) {
+            slider.setAccentColor(hex);
+            if (dbLabel.has_style_class_name('non-zero'))
+                dbLabel.style = `color: ${accent.hex};`;
+            else
+                dbLabel.style = null;
+        }
+
+        this._bassSlider?.setAccentColor(hex);
+        this._trebleSlider?.setAccentColor(hex);
+
+        if (this._dspToggleBtn && this._eq.enabled) {
+            this._dspToggleBtn.style = `background-color: ${accent.rgba(0.20)}; border-color: ${accent.rgba(0.45)};`;
+            this._dspToggleLabel.style = `color: ${accent.hex};`;
+        } else if (this._dspToggleBtn) {
+            this._dspToggleBtn.style = null;
+            this._dspToggleLabel.style = null;
+        }
+    }
+
+    setCompactMode(isCompact) {
+        if (this._destroyed || !this.actor)
+            return;
+        const targetHeight = isCompact ? 90 : 112;
+        for (const {slider} of this._bandWidgets) {
+            slider._preferredHeight = targetHeight;
+            slider._allocatedHeight = targetHeight;
+            slider.set_height(targetHeight);
+            slider.queue_repaint();
+        }
+        if (this._eqTitleLabel)
+            this._eqTitleLabel.visible = !isCompact;
     }
 
     destroy() {

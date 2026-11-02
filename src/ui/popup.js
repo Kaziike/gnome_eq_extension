@@ -12,6 +12,9 @@ import * as PanelMenu from 'resource:///org/gnome/shell/ui/panelMenu.js';
 import {PlayerWidget} from './player-widget.js';
 import {VolumeWidget} from './volume-widget.js';
 import {EqualizerWidget} from './equalizer-widget.js';
+import {PopupLayoutManager} from './layout-manager.js';
+import {INTERFACE_SETTING_KEYS} from '../utils/settings.js';
+import {parseAccentColor} from '../utils/helpers.js';
 
 export const MusicEqualizerIndicator = GObject.registerClass(
 class MusicEqualizerIndicator extends PanelMenu.Button {
@@ -22,8 +25,9 @@ class MusicEqualizerIndicator extends PanelMenu.Button {
      * @param {import('../audio/equalizer.js').EqualizerManager} params.equalizerManager
      * @param {import('../utils/settings.js').SettingsManager} params.settings
      * @param {string} params.extensionPath
+     * @param {Function} [params.onOpenPreferences=null]
      */
-    _init({mprisManager, audioController, equalizerManager, settings, extensionPath}) {
+    _init({mprisManager, audioController, equalizerManager, settings, extensionPath, onOpenPreferences = null}) {
         super._init(0.5, 'Music Control & Equalizer', false);
 
         this._mpris = mprisManager;
@@ -31,6 +35,7 @@ class MusicEqualizerIndicator extends PanelMenu.Button {
         this._eq = equalizerManager;
         this._settings = settings;
         this._extensionPath = extensionPath;
+        this._onOpenPreferences = onOpenPreferences;
         this._destroyed = false;
 
         this._buildPanelIndicator();
@@ -81,27 +86,38 @@ class MusicEqualizerIndicator extends PanelMenu.Button {
 
         this._rootContainer = new St.BoxLayout({
             style_class: 'mce-popup-root',
-            orientation: Clutter.Orientation.VERTICAL,
+            orientation: Clutter.Orientation.HORIZONTAL,
             reactive: true,
         });
+
+        this._volumeWidget = new VolumeWidget(this._audio, this._settings);
 
         this._playerWidget = new PlayerWidget(
             this._mpris,
             this._audio,
             this._settings,
-            this._extensionPath
+            this._extensionPath,
+            this._volumeWidget
         );
-
-        this._volumeWidget = new VolumeWidget(this._audio);
 
         this._equalizerWidget = new EqualizerWidget(
             this._eq,
-            this._extensionPath
+            this._extensionPath,
+            this._settings,
+            () => {
+                this.menu.close();
+                if (typeof this._onOpenPreferences === 'function')
+                    this._onOpenPreferences();
+            }
         );
 
-        this._rootContainer.add_child(this._playerWidget.actor);
-        this._rootContainer.add_child(this._volumeWidget.actor);
-        this._rootContainer.add_child(this._equalizerWidget.actor);
+        this._layoutManager = new PopupLayoutManager({
+            rootContainer: this._rootContainer,
+            popupBox: this.menu.box,
+            musicPanel: this._playerWidget,
+            equalizerPanel: this._equalizerWidget,
+            settings: this._settings,
+        });
 
         this.menu.box.add_child(this._rootContainer);
 
@@ -121,6 +137,15 @@ class MusicEqualizerIndicator extends PanelMenu.Button {
         this._settings.connectChanged('show-track-in-panel', () => {
             this._syncPanelIndicator();
         });
+
+        for (const key of INTERFACE_SETTING_KEYS) {
+            this._settings.connectChanged(key, () => {
+                if (this._destroyed)
+                    return;
+                this._layoutManager?.applyLayout();
+                this._syncPanelIndicator();
+            });
+        }
     }
 
     _syncPanelIndicator() {
@@ -128,11 +153,15 @@ class MusicEqualizerIndicator extends PanelMenu.Button {
             return;
         const player = this._mpris.activePlayer;
         const showTrack = this._settings.showTrackInPanel;
+        const accent = parseAccentColor(this._settings.accentColor);
 
-        if (player && player.isPlaying)
+        if (player && player.isPlaying) {
             this._panelIcon.add_style_class_name('playing');
-        else
+            this._panelIcon.style = `color: ${accent.hex};`;
+        } else {
             this._panelIcon.remove_style_class_name('playing');
+            this._panelIcon.style = null;
+        }
 
         if (showTrack && player && player.hasMetadata) {
             this._panelLabel.visible = true;
@@ -157,11 +186,14 @@ class MusicEqualizerIndicator extends PanelMenu.Button {
             this._mprisSignalIds = [];
         }
 
-        this._playerWidget?.destroy();
-        this._playerWidget = null;
+        this._layoutManager?.destroy();
+        this._layoutManager = null;
 
         this._volumeWidget?.destroy();
         this._volumeWidget = null;
+
+        this._playerWidget?.destroy();
+        this._playerWidget = null;
 
         this._equalizerWidget?.destroy();
         this._equalizerWidget = null;

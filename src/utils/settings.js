@@ -5,6 +5,46 @@ import GLib from 'gi://GLib';
 import {clamp, roundToStep, slugifyPresetName, Logger} from './helpers.js';
 import {BUILTIN_PRESETS, DEFAULT_BAND_COUNT} from '../audio/presets.js';
 
+export const LayoutMode = {
+    DUAL_PANEL: 'dual-panel',
+    VERTICAL: 'vertical',
+    COMPACT: 'compact',
+    MUSIC_ONLY: 'music-only',
+    EQ_ONLY: 'eq-only',
+};
+
+export const VALID_LAYOUT_MODES = [
+    LayoutMode.DUAL_PANEL,
+    LayoutMode.VERTICAL,
+    LayoutMode.COMPACT,
+    LayoutMode.MUSIC_ONLY,
+    LayoutMode.EQ_ONLY,
+];
+
+export const VALID_POPUP_SCALES = ['small', 'medium', 'large'];
+
+export const ACCENT_PRESETS = [
+    {id: '#257ef9', name: 'Electric Blue (Default)'},
+    {id: '#00c4cc', name: 'Cyan Glow'},
+    {id: '#8b5cf6', name: 'Royal Purple'},
+    {id: '#10b981', name: 'Emerald Green'},
+    {id: '#f59e0b', name: 'Amber Gold'},
+    {id: '#ec4899', name: 'Neon Rose'},
+];
+
+export const INTERFACE_SETTING_KEYS = [
+    'layout-mode',
+    'popup-scale',
+    'left-panel-width',
+    'right-panel-width',
+    'show-album-art',
+    'show-media-source',
+    'show-bass-treble',
+    'show-time-info',
+    'accent-color',
+    'popup-opacity',
+];
+
 export class SettingsManager {
     /**
      * @param {Gio.Settings} gsettings
@@ -106,6 +146,111 @@ export class SettingsManager {
 
     set panelPosition(value) {
         this._settings.set_string('panel-position', String(value || 'right'));
+    }
+
+    get layoutMode() {
+        const raw = this._settings.get_string('layout-mode') || LayoutMode.DUAL_PANEL;
+        return VALID_LAYOUT_MODES.includes(raw) ? raw : LayoutMode.DUAL_PANEL;
+    }
+
+    set layoutMode(mode) {
+        const valid = VALID_LAYOUT_MODES.includes(mode) ? mode : LayoutMode.DUAL_PANEL;
+        this._settings.set_string('layout-mode', valid);
+    }
+
+    get popupScale() {
+        const raw = this._settings.get_string('popup-scale') || 'medium';
+        return VALID_POPUP_SCALES.includes(raw) ? raw : 'medium';
+    }
+
+    set popupScale(scale) {
+        const valid = VALID_POPUP_SCALES.includes(scale) ? scale : 'medium';
+        this._settings.set_string('popup-scale', valid);
+    }
+
+    get popupScaleFactor() {
+        const scale = this.popupScale;
+        if (scale === 'small')
+            return 0.90;
+        if (scale === 'large')
+            return 1.12;
+        return 1.0;
+    }
+
+    get leftPanelWidth() {
+        return clamp(this._settings.get_int('left-panel-width'), 240, 460);
+    }
+
+    set leftPanelWidth(width) {
+        this._settings.set_int('left-panel-width', Math.round(clamp(Number(width), 240, 460)));
+    }
+
+    get rightPanelWidth() {
+        return clamp(this._settings.get_int('right-panel-width'), 420, 780);
+    }
+
+    set rightPanelWidth(width) {
+        this._settings.set_int('right-panel-width', Math.round(clamp(Number(width), 420, 780)));
+    }
+
+    get showAlbumArt() {
+        return this._settings.get_boolean('show-album-art');
+    }
+
+    set showAlbumArt(value) {
+        this._settings.set_boolean('show-album-art', Boolean(value));
+    }
+
+    get showMediaSource() {
+        return this._settings.get_boolean('show-media-source');
+    }
+
+    set showMediaSource(value) {
+        this._settings.set_boolean('show-media-source', Boolean(value));
+    }
+
+    get showBassTreble() {
+        return this._settings.get_boolean('show-bass-treble');
+    }
+
+    set showBassTreble(value) {
+        this._settings.set_boolean('show-bass-treble', Boolean(value));
+    }
+
+    get showTimeInfo() {
+        return this._settings.get_boolean('show-time-info');
+    }
+
+    set showTimeInfo(value) {
+        this._settings.set_boolean('show-time-info', Boolean(value));
+    }
+
+    get accentColor() {
+        const raw = this._settings.get_string('accent-color') || '#257ef9';
+        return /^#[0-9a-fA-F]{6}$/.test(raw.trim()) ? raw.trim().toLowerCase() : '#257ef9';
+    }
+
+    set accentColor(hex) {
+        const valid = typeof hex === 'string' && /^#[0-9a-fA-F]{6}$/.test(hex.trim())
+            ? hex.trim().toLowerCase()
+            : '#257ef9';
+        this._settings.set_string('accent-color', valid);
+    }
+
+    get popupOpacity() {
+        return clamp(this._settings.get_int('popup-opacity'), 65, 100);
+    }
+
+    set popupOpacity(value) {
+        this._settings.set_int('popup-opacity', Math.round(clamp(Number(value), 65, 100)));
+    }
+
+    /**
+     * Reset only interface customization settings to defaults.
+     */
+    resetInterfaceToDefaults() {
+        for (const key of INTERFACE_SETTING_KEYS)
+            this._settings.reset(key);
     }
 
     /**
@@ -225,6 +370,7 @@ export class SettingsManager {
             'show-remaining-time',
             'show-track-in-panel',
             'panel-position',
+            ...INTERFACE_SETTING_KEYS,
         ];
         for (const key of keys)
             this._settings.reset(key);

@@ -174,3 +174,31 @@ export function slugifyPresetName(name) {
         .replace(/^_+|_+$/g, '');
     return `user_${base || 'preset'}_${GLib.get_monotonic_time().toString(36).slice(-4)}`;
 }
+
+/**
+ * Convert a hex color string (e.g. '#257ef9') into normalized Cairo RGB [r, g, b] in [0..1]
+ * and CSS rgba() helper.
+ *
+ * @param {string} hex
+ * @returns {{hex: string, r: number, g: number, b: number, r255: number, g255: number, b255: number, rgba: (alpha: number) => string}}
+ */
+export function parseAccentColor(hex) {
+    const clean = typeof hex === 'string' && /^#[0-9a-fA-F]{6}$/.test(hex.trim())
+        ? hex.trim().toLowerCase()
+        : '#257ef9';
+
+    const r255 = parseInt(clean.slice(1, 3), 16);
+    const g255 = parseInt(clean.slice(3, 5), 16);
+    const b255 = parseInt(clean.slice(5, 7), 16);
+
+    return {
+        hex: clean,
+        r: r255 / 255,
+        g: g255 / 255,
+        b: b255 / 255,
+        r255,
+        g255,
+        b255,
+        rgba: alpha => `rgba(${r255}, ${g255}, ${b255}, ${alpha})`,
+    };
+}

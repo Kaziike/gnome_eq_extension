@@ -4,7 +4,7 @@
 import Clutter from 'gi://Clutter';
 import GObject from 'gi://GObject';
 import St from 'gi://St';
-import {clamp, roundToStep} from '../utils/helpers.js';
+import {clamp, roundToStep, parseAccentColor} from '../utils/helpers.js';
 
 const TAU = Math.PI * 2;
 
@@ -66,6 +66,7 @@ export const BaseSlider = GObject.registerClass({
         this._grab = null;
         this._dragging = false;
         this._interactive = true;
+        this._accent = parseAccentColor('#257ef9');
 
         this._value = this._sanitizeValue(value);
 
@@ -137,6 +138,11 @@ export const BaseSlider = GObject.registerClass({
     setInteractive(interactive) {
         this._interactive = Boolean(interactive);
         this.opacity = this._interactive ? 255 : 120;
+        this.queue_repaint();
+    }
+
+    setAccentColor(hex) {
+        this._accent = parseAccentColor(hex);
         this.queue_repaint();
     }
 
@@ -404,7 +410,7 @@ class HorizontalSlider extends BaseSlider {
         cr.setSourceRGBA(1.0, 1.0, 1.0, 0.16);
         cr.fill();
 
-        // 2. Active Track Fill (Electric Blue #257ef9)
+        // 2. Active Track Fill (Dynamic Accent Color)
         const activeWidth = Math.max(0, handleX - m.trackLeft);
         if (activeWidth > 0.5) {
             this._drawRoundedBar(
@@ -415,7 +421,7 @@ class HorizontalSlider extends BaseSlider {
                 this._trackThickness,
                 trackRadius
             );
-            cr.setSourceRGBA(0.145, 0.494, 0.976, 1.0);
+            cr.setSourceRGBA(this._accent.r, this._accent.g, this._accent.b, 1.0);
             cr.fill();
         }
 
@@ -426,7 +432,7 @@ class HorizontalSlider extends BaseSlider {
 
         if (this.hover || this._dragging) {
             cr.arc(handleX, centerY, radius + 3.0, 0, TAU);
-            cr.setSourceRGBA(0.145, 0.494, 0.976, 0.28);
+            cr.setSourceRGBA(this._accent.r, this._accent.g, this._accent.b, 0.28);
             cr.fill();
         }
 
@@ -445,14 +451,16 @@ class HorizontalSlider extends BaseSlider {
 });
 
 /**
- * System Output Volume Row Widget (Speaker icon button + HorizontalSlider).
+ * System Output Volume Row Widget (Speaker icon button + HorizontalSlider + Volume % label).
  */
 export class VolumeWidget {
     /**
      * @param {import('../audio/pipewire.js').SystemAudioController} audioController
+     * @param {import('../utils/settings.js').SettingsManager} [settings]
      */
-    constructor(audioController) {
+    constructor(audioController, settings = null) {
         this._audio = audioController;
+        this._settings = settings;
         this._destroyed = false;
 
         this.actor = new St.BoxLayout({
@@ -489,16 +497,28 @@ export class VolumeWidget {
             handleRadius: 6,
         });
 
+        if (this._settings)
+            this._slider.setAccentColor(this._settings.accentColor);
+
+        this._percentLabel = new St.Label({
+            text: `${Math.round(clamp(this._audio.getVolume(), 0.0, 1.5) * 100)}%`,
+            style_class: 'mce-volume-percent-label',
+            y_align: Clutter.ActorAlign.CENTER,
+        });
+
         this._slider.connect('value-changed', (_slider, val) => {
             if (this._destroyed)
                 return;
             this._audio.setVolume(val);
             if (this._volumeIcon)
                 this._volumeIcon.icon_name = this._audio.getVolumeIconName();
+            if (this._percentLabel)
+                this._percentLabel.text = `${Math.round(clamp(val, 0.0, 1.5) * 100)}%`;
         });
 
         this.actor.add_child(this._muteButton);
         this.actor.add_child(this._slider);
+        this.actor.add_child(this._percentLabel);
 
         this._audioSignalId = this._audio.connect('volume-changed', () => {
             this._syncFromAudio();
@@ -507,12 +527,21 @@ export class VolumeWidget {
         this._syncFromAudio();
     }
 
+    setAccentColor(hex) {
+        if (this._destroyed || !this._slider)
+            return;
+        this._slider.setAccentColor(hex);
+    }
+
     _syncFromAudio() {
         if (this._destroyed || !this.actor || !this._volumeIcon || !this._slider)
             return;
         this._volumeIcon.icon_name = this._audio.getVolumeIconName();
+        const vol = clamp(this._audio.getVolume(), 0.0, 1.0);
         if (!this._slider.isDragging)
-            this._slider.value = clamp(this._audio.getVolume(), 0.0, 1.0);
+            this._slider.value = vol;
+        if (this._percentLabel)
+            this._percentLabel.text = `${Math.round(this._audio.getVolume() * 100)}%`;
     }
 
     destroy() {
@@ -523,6 +552,7 @@ export class VolumeWidget {
         }
         this._volumeIcon = null;
         this._slider = null;
+        this._percentLabel = null;
         this.actor?.destroy();
         this.actor = null;
     }

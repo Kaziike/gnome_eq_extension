@@ -8,7 +8,7 @@ import Pango from 'gi://Pango';
 import St from 'gi://St';
 
 import {HorizontalSlider} from './volume-widget.js';
-import {clamp, formatDuration, Logger} from '../utils/helpers.js';
+import {clamp, formatDuration, parseAccentColor, Logger} from '../utils/helpers.js';
 
 export class PlayerWidget {
     /**
@@ -16,15 +16,18 @@ export class PlayerWidget {
      * @param {import('../audio/pipewire.js').SystemAudioController} audioController
      * @param {import('../utils/settings.js').SettingsManager} settings
      * @param {string} extensionPath
+     * @param {import('./volume-widget.js').VolumeWidget} [volumeWidget=null]
      */
-    constructor(mprisManager, audioController, settings, extensionPath) {
+    constructor(mprisManager, audioController, settings, extensionPath, volumeWidget = null) {
         this._mpris = mprisManager;
         this._audio = audioController;
         this._settings = settings;
         this._extensionPath = extensionPath;
+        this._volumeWidget = volumeWidget;
 
         this._cancellable = new Gio.Cancellable();
         this._currentArtUrl = '';
+        this._currentCoverUri = '';
         this._positionTimerId = 0;
         this._popupOpen = false;
         this._destroyed = false;
@@ -40,16 +43,21 @@ export class PlayerWidget {
             style_class: 'mce-player-section',
             orientation: Clutter.Orientation.VERTICAL,
             x_expand: true,
+            y_expand: true,
         });
 
         this._buildHeader();
         this._buildDropdownDrawers();
         this._buildProgressSection();
         this._buildTransportControls();
+        if (this._volumeWidget?.actor)
+            this.actor.add_child(this._volumeWidget.actor);
+        this._buildMediaSourceCard();
 
         this._bindSignals();
         this._syncPlayerState();
         this._syncOutputDevice();
+        this.syncInterfaceSettings();
     }
 
     _buildHeader() {
@@ -86,7 +94,7 @@ export class PlayerWidget {
             this._mpris.activePlayer?.raisePlayerApp();
         });
 
-        // 2. Track Info Column (Title, Artist/Album, Player Selector badge)
+        // 2. Track Info Column (Title & Artist/Album)
         this._metaColumn = new St.BoxLayout({
             style_class: 'mce-meta-column',
             orientation: Clutter.Orientation.VERTICAL,
@@ -115,82 +123,25 @@ export class PlayerWidget {
         });
         this._artistLabel.clutter_text.ellipsize = Pango.EllipsizeMode.END;
 
-        // Compact MPRIS Player switcher badge (shown when >= 2 players or active player)
-        this._playerBadgeButton = new St.Button({
-            style_class: 'mce-player-badge',
-            can_focus: true,
-            visible: false,
-            y_align: Clutter.ActorAlign.CENTER,
-        });
-        const playerBadgeBox = new St.BoxLayout({
-            style_class: 'mce-player-badge-box',
-            y_align: Clutter.ActorAlign.CENTER,
-        });
-        this._playerBadgeIcon = new St.Icon({
-            icon_name: 'audio-x-generic-symbolic',
-            icon_size: 11,
-            style_class: 'mce-player-badge-icon',
-        });
-        this._playerBadgeLabel = new St.Label({
-            text: 'Player',
-            style_class: 'mce-player-badge-label',
-        });
-        this._playerBadgeArrow = new St.Icon({
-            icon_name: 'pan-down-symbolic',
-            icon_size: 10,
-            style_class: 'mce-pill-arrow',
-        });
-        playerBadgeBox.add_child(this._playerBadgeIcon);
-        playerBadgeBox.add_child(this._playerBadgeLabel);
-        playerBadgeBox.add_child(this._playerBadgeArrow);
-        this._playerBadgeButton.set_child(playerBadgeBox);
-
-        this._playerBadgeButton.connect('clicked', () => {
-            this._togglePlayerListDrawer();
-        });
-
         this._artistRow.add_child(this._artistLabel);
-        this._artistRow.add_child(this._playerBadgeButton);
 
         this._metaColumn.add_child(this._titleLabel);
         this._metaColumn.add_child(this._artistRow);
 
-        // 3. Hardware Audio Output Device Dropdown Pill (Right side of Header)
+        // 3. Hardware Audio Output Device Button (Icon-only button, full dropdown functionality)
         this._outputButton = new St.Button({
-            style_class: 'mce-output-pill',
+            style_class: 'mce-output-pill mce-output-icon-only',
             can_focus: true,
-            y_align: Clutter.ActorAlign.START,
-        });
-
-        const outputPillBox = new St.BoxLayout({
-            style_class: 'mce-output-pill-box',
             y_align: Clutter.ActorAlign.CENTER,
         });
 
         this._outputIcon = new St.Icon({
             icon_name: 'audio-headphones-symbolic',
-            icon_size: 14,
+            icon_size: 16,
             style_class: 'mce-output-pill-icon',
         });
 
-        this._outputLabel = new St.Label({
-            text: 'Headphones',
-            style_class: 'mce-output-pill-label',
-            y_align: Clutter.ActorAlign.CENTER,
-        });
-        this._outputLabel.clutter_text.ellipsize = Pango.EllipsizeMode.END;
-
-        this._outputArrow = new St.Icon({
-            icon_name: 'pan-down-symbolic',
-            icon_size: 12,
-            style_class: 'mce-pill-arrow',
-            y_align: Clutter.ActorAlign.CENTER,
-        });
-
-        outputPillBox.add_child(this._outputIcon);
-        outputPillBox.add_child(this._outputLabel);
-        outputPillBox.add_child(this._outputArrow);
-        this._outputButton.set_child(outputPillBox);
+        this._outputButton.set_child(this._outputIcon);
 
         this._outputButton.connect('clicked', () => {
             this._toggleOutputDrawer();
@@ -288,6 +239,7 @@ export class PlayerWidget {
 
         this._progressContainer.add_child(this._progressSlider);
         this._progressContainer.add_child(timeRow);
+        this._timeRow = timeRow;
 
         this.actor.add_child(this._progressContainer);
     }
@@ -364,6 +316,78 @@ export class PlayerWidget {
         }
 
         this.actor.add_child(this._controlsRow);
+    }
+
+    _buildMediaSourceCard() {
+        this._mediaSourceButton = new St.Button({
+            style_class: 'mce-media-source-card',
+            can_focus: true,
+            x_expand: true,
+            y_align: Clutter.ActorAlign.END,
+        });
+
+        const cardBox = new St.BoxLayout({
+            style_class: 'mce-media-source-box',
+            x_expand: true,
+            y_align: Clutter.ActorAlign.CENTER,
+        });
+
+        this._sourceThumbBin = new St.Bin({
+            style_class: 'mce-media-source-thumb',
+            width: 34,
+            height: 34,
+            x_align: Clutter.ActorAlign.CENTER,
+            y_align: Clutter.ActorAlign.CENTER,
+        });
+
+        this._sourceIcon = new St.Icon({
+            icon_name: 'audio-x-generic-symbolic',
+            icon_size: 16,
+            style_class: 'mce-media-source-icon',
+        });
+        this._sourceThumbBin.set_child(this._sourceIcon);
+
+        const textCol = new St.BoxLayout({
+            style_class: 'mce-media-source-text-col',
+            orientation: Clutter.Orientation.VERTICAL,
+            x_expand: true,
+            y_align: Clutter.ActorAlign.CENTER,
+        });
+
+        this._sourceTitleLabel = new St.Label({
+            text: 'No Active Media Source',
+            style_class: 'mce-media-source-title',
+            x_align: Clutter.ActorAlign.START,
+        });
+        this._sourceTitleLabel.clutter_text.ellipsize = Pango.EllipsizeMode.END;
+
+        this._sourceDetailLabel = new St.Label({
+            text: 'Waiting for MPRIS playback…',
+            style_class: 'mce-media-source-detail',
+            x_align: Clutter.ActorAlign.START,
+        });
+        this._sourceDetailLabel.clutter_text.ellipsize = Pango.EllipsizeMode.END;
+
+        textCol.add_child(this._sourceTitleLabel);
+        textCol.add_child(this._sourceDetailLabel);
+
+        this._sourceTypeBadge = new St.Label({
+            text: 'AUDIO',
+            style_class: 'mce-media-source-badge',
+            y_align: Clutter.ActorAlign.CENTER,
+            visible: false,
+        });
+
+        cardBox.add_child(this._sourceThumbBin);
+        cardBox.add_child(textCol);
+        cardBox.add_child(this._sourceTypeBadge);
+
+        this._mediaSourceButton.set_child(cardBox);
+        this._mediaSourceButton.connect('clicked', () => {
+            this._togglePlayerListDrawer();
+        });
+
+        this.actor.add_child(this._mediaSourceButton);
     }
 
     _createTransportButton(iconName, styleClass, iconSize, onClick) {
@@ -602,30 +626,14 @@ export class PlayerWidget {
     }
 
     _syncOutputDevice() {
-        if (this._destroyed || !this.actor || !this._outputIcon || !this._outputLabel)
+        if (this._destroyed || !this.actor || !this._outputIcon)
             return;
         const active = this._audio.getActiveDevice();
         this._outputIcon.icon_name = active.iconName || 'audio-headphones-symbolic';
-        this._outputLabel.text = active.shortLabel || 'Headphones';
     }
 
     _syncPlayerBadge() {
-        if (this._destroyed || !this.actor || !this._playerBadgeButton)
-            return;
-        const players = this._mpris.players;
-        const active = this._mpris.activePlayer;
-
-        if (!active) {
-            this._playerBadgeButton.visible = false;
-            return;
-        }
-
-        this._playerBadgeButton.visible = true;
-        this._playerBadgeIcon.icon_name = active.iconName;
-        this._playerBadgeLabel.text = players.length > 1
-            ? `${active.identity} (${players.length})`
-            : active.identity;
-        this._playerBadgeArrow.visible = players.length > 1;
+        // Player badge under song title removed for cleaner UI; Media Source card handles player switching
     }
 
     _syncPlayerState() {
@@ -647,6 +655,8 @@ export class PlayerWidget {
             this._elapsedLabel.text = '00:00';
             this._durationLabel.text = '-00:00';
             this._setTransportSensitivity(false);
+            this._syncMediaSource(null);
+            this._applyAccentStyles();
             return;
         }
 
@@ -660,6 +670,7 @@ export class PlayerWidget {
             : artistText;
 
         this._setAlbumArt(player.artUrl);
+        this._syncMediaSource(player);
 
         this._playPauseIcon.icon_name = player.isPlaying
             ? 'media-playback-pause-symbolic'
@@ -682,7 +693,45 @@ export class PlayerWidget {
             this._repeatBtn.button.remove_style_class_name('active');
         }
 
+        this._applyAccentStyles();
         this._syncProgress();
+    }
+
+    _syncMediaSource(player) {
+        if (this._destroyed || !this._mediaSourceButton)
+            return;
+
+        if (!player) {
+            this._sourceTitleLabel.text = 'No Active Media Source';
+            this._sourceDetailLabel.text = 'Waiting for MPRIS stream…';
+            this._sourceIcon.icon_name = 'audio-x-generic-symbolic';
+            this._sourceIcon.visible = true;
+            this._sourceThumbBin.style = null;
+            this._sourceTypeBadge.visible = false;
+            return;
+        }
+
+        const info = player.mediaSourceInfo;
+        this._sourceTitleLabel.text = info.sourceLabel;
+        this._sourceDetailLabel.text = info.detailLabel;
+        this._sourceIcon.icon_name = info.iconName;
+
+        this._sourceTypeBadge.visible = true;
+        this._sourceTypeBadge.text = info.isVideo ? 'VIDEO' : 'AUDIO';
+        if (info.isVideo)
+            this._sourceTypeBadge.add_style_class_name('video');
+        else
+            this._sourceTypeBadge.remove_style_class_name('video');
+
+        // For video streams with real artwork/thumbnail, show the real thumbnail in the source badge
+        // without faking thumbnails if none exist
+        if (info.isVideo && this._currentCoverUri) {
+            this._sourceIcon.visible = false;
+            this._sourceThumbBin.style = `background-image: url("${this._currentCoverUri}"); background-size: cover; background-position: center;`;
+        } else {
+            this._sourceThumbBin.style = null;
+            this._sourceIcon.visible = true;
+        }
     }
 
     _setTransportSensitivity(hasPlayer) {
@@ -841,15 +890,71 @@ export class PlayerWidget {
     _applyCoverFileUri(fileUri) {
         if (this._destroyed || !this._artBox)
             return;
+        this._currentCoverUri = fileUri;
         this._fallbackArtIcon.visible = false;
         this._artBox.style = `background-image: url("${fileUri}"); background-size: cover; background-position: center;`;
+        if (this._mpris.activePlayer)
+            this._syncMediaSource(this._mpris.activePlayer);
     }
 
     _applyFallbackArt() {
         if (this._destroyed || !this._artBox)
             return;
+        this._currentCoverUri = '';
         this._artBox.style = null;
         this._fallbackArtIcon.visible = true;
+        if (this._mpris.activePlayer)
+            this._syncMediaSource(this._mpris.activePlayer);
+    }
+
+    syncInterfaceSettings() {
+        if (this._destroyed || !this.actor || !this._settings)
+            return;
+
+        if (this._artButton)
+            this._artButton.visible = this._settings.showAlbumArt;
+
+        if (this._timeRow)
+            this._timeRow.visible = this._settings.showTimeInfo;
+
+        if (this._mediaSourceButton)
+            this._mediaSourceButton.visible = this._settings.showMediaSource;
+
+        this._applyAccentStyles();
+    }
+
+    setCompactMode(isCompact) {
+        if (this._destroyed || !this.actor)
+            return;
+        const artSize = isCompact ? 44 : 56;
+        if (this._artBox) {
+            this._artBox.width = artSize;
+            this._artBox.height = artSize;
+        }
+    }
+
+    _applyAccentStyles() {
+        if (this._destroyed || !this._settings)
+            return;
+
+        const hex = this._settings.accentColor;
+        const accent = parseAccentColor(hex);
+
+        this._progressSlider?.setAccentColor(hex);
+        this._volumeWidget?.setAccentColor(hex);
+
+        if (this._playPauseBtn) {
+            this._playPauseBtn.style = `background-color: ${accent.hex}; box-shadow: 0 4px 14px ${accent.rgba(0.42)};`;
+        }
+
+        for (const ctrl of [this._shuffleBtn, this._repeatBtn]) {
+            if (!ctrl?.button)
+                continue;
+            if (ctrl.button.has_style_class_name('active'))
+                ctrl.button.style = `color: ${accent.hex}; background-color: ${accent.rgba(0.16)};`;
+            else
+                ctrl.button.style = null;
+        }
     }
 
     destroy() {

@@ -34,6 +34,13 @@ export default class MusicControlEqualizerExtension extends Extension {
             equalizerManager: this._equalizerManager,
             settings: this._settings,
             extensionPath: this.path,
+            onOpenPreferences: () => {
+                try {
+                    this.openPreferences();
+                } catch (e) {
+                    Logger.warn('Failed to open extension preferences', e);
+                }
+            },
         });
 
         const pos = this._settings.panelPosition;

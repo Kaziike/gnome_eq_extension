@@ -65,5 +65,69 @@
       <description>Where to place the indicator on the GNOME Top Bar: left, center, or right.</description>
     </key>
 
+    <!-- Interface Customization Keys -->
+    <key name="layout-mode" type="s">
+      <default>'dual-panel'</default>
+      <summary>Popup interface layout mode</summary>
+      <description>Layout mode for the popup interface: dual-panel, vertical, compact, music-only, or eq-only.</description>
+    </key>
+
+    <key name="popup-scale" type="s">
+      <default>'medium'</default>
+      <summary>Overall popup size scale</summary>
+      <description>Scale factor for popup dimensions: small, medium, or large.</description>
+    </key>
+
+    <key name="left-panel-width" type="i">
+      <default>310</default>
+      <range min="240" max="460"/>
+      <summary>Music &amp; Media panel width in pixels</summary>
+      <description>Width of the left Music &amp; Media panel in Dual Panel layout (or total width in Vertical/Music-Only layouts).</description>
+    </key>
+
+    <key name="right-panel-width" type="i">
+      <default>560</default>
+      <range min="420" max="780"/>
+      <summary>Equalizer panel width in pixels</summary>
+      <description>Width of the right Equalizer panel in Dual Panel layout (or total width in Equalizer-Only layout).</description>
+    </key>
+
+    <key name="show-album-art" type="b">
+      <default>true</default>
+      <summary>Show Album Art</summary>
+      <description>Whether to display the album cover artwork in the Music &amp; Media panel.</description>
+    </key>
+
+    <key name="show-media-source" type="b">
+      <default>true</default>
+      <summary>Show Media Source card</summary>
+      <description>Whether to display the Media Source &amp; Video/Audio stream information card at the bottom of the Music panel.</description>
+    </key>
+
+    <key name="show-bass-treble" type="b">
+      <default>true</default>
+      <summary>Show Bass &amp; Treble controls</summary>
+      <description>Whether to display the Bass and Treble shelf sliders below the 10-band Equalizer.</description>
+    </key>
+
+    <key name="show-time-info" type="b">
+      <default>true</default>
+      <summary>Show track elapsed and remaining time</summary>
+      <description>Whether to display the current time and remaining/total time labels under the progress bar.</description>
+    </key>
+
+    <key name="accent-color" type="s">
+      <default>'#257ef9'</default>
+      <summary>Accent color hex code</summary>
+      <description>Primary accent color for sliders, active buttons, and badges (e.g. #257ef9, #00c4cc, #8b5cf6, #10b981, #f59e0b, #ec4899).</description>
+    </key>
+
+    <key name="popup-opacity" type="i">
+      <default>94</default>
+      <range min="65" max="100"/>
+      <summary>Popup background opacity percentage</summary>
+      <description>Background opacity of the dark glassmorphic popup container (65% to 100%).</description>
+    </key>
+
   </schema>
 </schemalist>

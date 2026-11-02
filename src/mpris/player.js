@@ -110,6 +110,7 @@ export class MprisPlayerController extends EventEmitter {
         this._artist = '';
         this._album = '';
         this._artUrl = '';
+        this._url = '';
         this._lengthUs = 0;
 
         this._positionUs = 0;
@@ -275,6 +276,7 @@ export class MprisPlayerController extends EventEmitter {
             this._artist = '';
             this._album = '';
             this._artUrl = '';
+            this._url = '';
             this._lengthUs = 0;
             return;
         }
@@ -313,6 +315,10 @@ export class MprisPlayerController extends EventEmitter {
 
         this._artUrl = typeof unpacked['mpris:artUrl'] === 'string'
             ? unpacked['mpris:artUrl'].trim()
+            : '';
+
+        this._url = typeof unpacked['xesam:url'] === 'string'
+            ? unpacked['xesam:url'].trim()
             : '';
 
         const rawLen = Number(unpacked['mpris:length']);
@@ -429,6 +435,97 @@ export class MprisPlayerController extends EventEmitter {
 
     get artUrl() {
         return this._artUrl || '';
+    }
+
+    get url() {
+        return this._url || '';
+    }
+
+    /**
+     * Detect whether the active MPRIS stream is likely a video stream and return
+     * real source metadata without faking thumbnails or embedding video.
+     *
+     * @returns {{isVideo: boolean, sourceLabel: string, detailLabel: string, iconName: string}}
+     */
+    get mediaSourceInfo() {
+        const lowerBus = `${this._busName} ${this._desktopEntry} ${this._identity}`.toLowerCase();
+        const lowerUrl = (this._url || '').toLowerCase();
+        const lowerTitle = (this._title || '').toLowerCase();
+        const lowerAlbum = (this._album || '').toLowerCase();
+
+        const isVideoApp =
+            lowerBus.includes('vlc') ||
+            lowerBus.includes('mpv') ||
+            lowerBus.includes('celluloid') ||
+            lowerBus.includes('totem') ||
+            lowerBus.includes('clapper') ||
+            lowerBus.includes('haruna') ||
+            lowerBus.includes('smplayer');
+
+        const isVideoFile = /\.(mp4|mkv|webm|avi|mov|flv|m4v|ts)(\?|$)/i.test(lowerUrl);
+        const isYouTube =
+            lowerUrl.includes('youtube.com') ||
+            lowerUrl.includes('youtu.be') ||
+            lowerTitle.includes('youtube') ||
+            lowerAlbum.includes('youtube');
+        const isTwitchOrVimeo =
+            lowerUrl.includes('twitch.tv') ||
+            lowerUrl.includes('vimeo.com') ||
+            lowerUrl.includes('bilibili.com');
+
+        const isBrowser =
+            lowerBus.includes('firefox') ||
+            lowerBus.includes('brave') ||
+            lowerBus.includes('chrom') ||
+            lowerBus.includes('edge') ||
+            lowerBus.includes('zen') ||
+            lowerBus.includes('vivaldi') ||
+            lowerBus.includes('opera');
+
+        const isVideo = isVideoApp || isVideoFile || isYouTube || isTwitchOrVimeo;
+
+        if (isYouTube) {
+            return {
+                isVideo: true,
+                sourceLabel: 'Playing as Audio – YouTube',
+                detailLabel: `${this.identity} • Video Stream`,
+                iconName: 'video-x-generic-symbolic',
+            };
+        }
+
+        if (isTwitchOrVimeo) {
+            return {
+                isVideo: true,
+                sourceLabel: `Playing as Audio – ${this.identity}`,
+                detailLabel: 'Web Video Stream',
+                iconName: 'video-x-generic-symbolic',
+            };
+        }
+
+        if (isVideoApp || isVideoFile) {
+            return {
+                isVideo: true,
+                sourceLabel: `Playing Video from ${this.identity}`,
+                detailLabel: this._album || 'Video Media Player',
+                iconName: 'video-x-generic-symbolic',
+            };
+        }
+
+        if (isBrowser) {
+            return {
+                isVideo: false,
+                sourceLabel: `Playing from ${this.identity}`,
+                detailLabel: this._album || 'Web Media Playback',
+                iconName: this.iconName,
+            };
+        }
+
+        return {
+            isVideo: false,
+            sourceLabel: `Playing from ${this.identity}`,
+            detailLabel: this._album || 'MPRIS Audio Source',
+            iconName: this.iconName,
+        };
     }
 
     get lengthUs() {
