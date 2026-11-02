@@ -54,12 +54,15 @@ Extension-music/
 │       ├── settings.js         # Typed GSettings wrapper & custom preset persistence
 │       └── helpers.js          # Formatting, clamping, player icon mapping & logging
 ├── schemas/
-│   ├── org.gnome.shell.extensions.music-control-equalizer.gschema.xml
-│   └── gschemas.compiled
+│   └── org.gnome.shell.extensions.music-control-equalizer.gschema.xml
 ├── assets/
 │   ├── music-note-symbolic.svg
 │   ├── bass-knob-symbolic.svg
 │   └── treble-clef-symbolic.svg
+├── docs/
+│   ├── plan.md                 # Design & architecture requirements
+│   └── fix.md                  # Bug investigations & fix documentation
+├── .gitignore
 ├── README.md
 └── LICENSE
 ```

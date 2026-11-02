@@ -6,27 +6,26 @@ import Gio from 'gi://Gio';
 import GObject from 'gi://GObject';
 import St from 'gi://St';
 
-import {HorizontalSlider} from './volume-widget.js';
+import {BaseSlider, HorizontalSlider} from './volume-widget.js';
 import {BackendStatus} from '../audio/pipewire.js';
-import {clamp, roundToStep, formatDb} from '../utils/helpers.js';
+import {roundToStep, formatDb} from '../utils/helpers.js';
 
 const TAU = Math.PI * 2;
 
 /**
  * Custom Cairo-rendered Vertical Equalizer Band Slider (-12dB to +12dB)
- * matching the reference UI (bottom-up electric blue bar fill + white circular thumb).
+ * extending BaseSlider to share the unified drag, coordinate mapping, and
+ * 0.1dB gain calculation logic.
  */
-export const VerticalBandSlider = GObject.registerClass({
-    Signals: {
-        'value-changed': {param_types: [GObject.TYPE_DOUBLE, GObject.TYPE_BOOLEAN]},
-    },
-}, class VerticalBandSlider extends St.DrawingArea {
+export const VerticalBandSlider = GObject.registerClass(
+class VerticalBandSlider extends BaseSlider {
     _init(params = {}) {
         const {
             min = -12.0,
             max = 12.0,
             value = 0.0,
             step = 0.5,
+            precision = 0.1,
             width = 28,
             height = 114,
             trackWidth = 6,
@@ -34,102 +33,22 @@ export const VerticalBandSlider = GObject.registerClass({
         } = params;
 
         super._init({
-            style_class: 'mce-vertical-slider',
-            reactive: true,
-            can_focus: true,
-            track_hover: true,
-            x_align: Clutter.ActorAlign.CENTER,
-            y_align: Clutter.ActorAlign.CENTER,
+            orientation: Clutter.Orientation.VERTICAL,
+            min,
+            max,
+            value,
+            step,
+            precision,
+            width,
+            height,
+            trackThickness: trackWidth,
+            handleRadius,
+            trackPadding: 3,
+            styleClass: 'mce-vertical-slider',
+            xExpand: false,
+            xAlign: Clutter.ActorAlign.CENTER,
+            yAlign: Clutter.ActorAlign.CENTER,
         });
-
-        this._min = min;
-        this._max = max;
-        this._value = clamp(value, min, max);
-        this._step = step;
-        this._trackWidth = trackWidth;
-        this._handleRadius = handleRadius;
-        this._dragging = false;
-
-        this.set_size(width, height);
-
-        this._panGesture = new Clutter.PanGesture();
-        this._panGesture.set_begin_threshold(0);
-        this._panGesture.connect('recognize', () => this._onPanBegin());
-        this._panGesture.connect('pan-update', () => this._onPanUpdate());
-        this._panGesture.connect('end', () => this._onPanEnd());
-        this._panGesture.connect('cancel', () => this._onPanEnd());
-        this.add_action(this._panGesture);
-
-        const scrollController = new Clutter.ScrollController({
-            flags: Clutter.ScrollControllerFlags.DISCRETE |
-                Clutter.ScrollControllerFlags.SCROLL_VERTICAL,
-        });
-        scrollController.connect('scroll', (_ctrl, _sprite, _src, _dx, dy) => {
-            const next = roundToStep(this._value - dy * this._step, 0.1);
-            this._setValueFromUser(next, true);
-            return Clutter.EVENT_STOP;
-        });
-        this.add_action(scrollController);
-
-        this.connect('notify::hover', () => this.queue_repaint());
-    }
-
-    get isDragging() {
-        return this._dragging;
-    }
-
-    get value() {
-        return this._value;
-    }
-
-    set value(val) {
-        const clamped = roundToStep(clamp(Number(val), this._min, this._max), 0.1);
-        if (Math.abs(this._value - clamped) < 0.01)
-            return;
-        this._value = clamped;
-        this.queue_repaint();
-    }
-
-    _yToValue(y) {
-        const [, height] = this.get_surface_size();
-        const pad = this._handleRadius + 3;
-        const usable = Math.max(1, height - pad * 2);
-        // Top = +12dB, Bottom = -12dB
-        const ratioFromBottom = 1.0 - clamp((y - pad) / usable, 0.0, 1.0);
-        const raw = this._min + ratioFromBottom * (this._max - this._min);
-        // Snap lightly to 0.0 dB when within 0.25 dB
-        if (Math.abs(raw) < 0.25)
-            return 0.0;
-        return roundToStep(raw, 0.1);
-    }
-
-    _setValueFromUser(nextVal, committed) {
-        const clamped = roundToStep(clamp(nextVal, this._min, this._max), 0.1);
-        this._value = clamped;
-        this.queue_repaint();
-        this.emit('value-changed', this._value, Boolean(committed));
-    }
-
-    _onPanBegin() {
-        this._dragging = true;
-        const coords = this._panGesture.get_centroid();
-        this._setValueFromUser(this._yToValue(coords.y), false);
-        return Clutter.EVENT_STOP;
-    }
-
-    _onPanUpdate() {
-        if (!this._dragging)
-            return;
-        const coords = this._panGesture.get_centroid();
-        this._setValueFromUser(this._yToValue(coords.y), false);
-    }
-
-    _onPanEnd() {
-        if (!this._dragging)
-            return;
-        this._dragging = false;
-        this.queue_repaint();
-        this.emit('value-changed', this._value, true);
     }
 
     vfunc_repaint() {
@@ -141,17 +60,13 @@ export const VerticalBandSlider = GObject.registerClass({
             return;
         }
 
-        const pad = this._handleRadius + 3;
-        const usableHeight = Math.max(1, height - pad * 2);
-        const centerX = width / 2;
-        const trackRadius = this._trackWidth / 2;
-        const trackBottom = height - pad;
-        const trackTop = pad;
-        const zeroY = pad + usableHeight * 0.5;
+        this._allocatedWidth = width;
+        this._allocatedHeight = height;
 
-        const range = Math.max(1e-6, this._max - this._min);
-        const ratioFromBottom = clamp((this._value - this._min) / range, 0.0, 1.0);
-        const handleY = trackBottom - usableHeight * ratioFromBottom;
+        const {coord: handleY, metrics: m} = this.mapValueToCoord(width, height);
+        const centerX = width / 2;
+        const trackRadius = this._trackThickness / 2;
+        const zeroY = m.trackTop + m.trackHeight * 0.5;
 
         // 1. Subtle 0dB reference tick line
         cr.setLineWidth(1.0);
@@ -161,25 +76,25 @@ export const VerticalBandSlider = GObject.registerClass({
         cr.stroke();
 
         // 2. Full vertical background track
-        this._drawVerticalRoundedBar(
+        this._drawRoundedBar(
             cr,
             centerX - trackRadius,
-            trackTop,
-            this._trackWidth,
-            usableHeight,
+            m.trackTop,
+            this._trackThickness,
+            m.trackHeight,
             trackRadius
         );
         cr.setSourceRGBA(1.0, 1.0, 1.0, 0.13);
         cr.fill();
 
         // 3. Electric blue active fill from bottom up to handleY (matching reference image)
-        const fillHeight = Math.max(0, trackBottom - handleY);
+        const fillHeight = Math.max(0, m.trackBottom - handleY);
         if (fillHeight > 0.5) {
-            this._drawVerticalRoundedBar(
+            this._drawRoundedBar(
                 cr,
                 centerX - trackRadius,
                 handleY,
-                this._trackWidth,
+                this._trackThickness,
                 fillHeight,
                 trackRadius
             );
@@ -210,16 +125,6 @@ export const VerticalBandSlider = GObject.registerClass({
 
         cr.$dispose();
     }
-
-    _drawVerticalRoundedBar(cr, x, y, w, h, r) {
-        const radius = Math.min(r, w / 2, h / 2);
-        cr.newSubPath();
-        cr.arc(x + w - radius, y + radius, radius, -Math.PI / 2, 0);
-        cr.arc(x + w - radius, y + h - radius, radius, 0, Math.PI / 2);
-        cr.arc(x + radius, y + h - radius, radius, Math.PI / 2, Math.PI);
-        cr.arc(x + radius, y + radius, radius, Math.PI, Math.PI * 1.5);
-        cr.closePath();
-    }
 });
 
 /**
@@ -234,6 +139,7 @@ export class EqualizerWidget {
         this._eq = equalizerManager;
         this._extensionPath = extensionPath;
         this._bandWidgets = [];
+        this._destroyed = false;
 
         this.actor = new St.BoxLayout({
             style_class: 'mce-eq-card',
@@ -511,6 +417,7 @@ export class EqualizerWidget {
                 max: 12.0,
                 value: initialGain,
                 step: 0.5,
+                precision: 0.1,
                 width: 28,
                 height: 112,
                 trackWidth: 6,
@@ -518,6 +425,8 @@ export class EqualizerWidget {
             });
 
             slider.connect('value-changed', (_s, val, committed) => {
+                if (this._destroyed)
+                    return;
                 dbLabel.text = this._formatBandDbShort(val);
                 if (Math.abs(val) >= 0.1)
                     dbLabel.add_style_class_name('non-zero');
@@ -584,6 +493,7 @@ export class EqualizerWidget {
             max: 12.0,
             value: this._eq.bassGain,
             step: 0.5,
+            precision: 0.1,
             height: 20,
             trackHeight: 4,
             handleRadius: 5.5,
@@ -597,6 +507,8 @@ export class EqualizerWidget {
         });
 
         this._bassSlider.connect('value-changed', (_s, val, committed) => {
+            if (this._destroyed)
+                return;
             const rounded = roundToStep(val, 0.1);
             this._bassValueLabel.text = formatDb(rounded, true, 1);
             this._eq.setBassGain(rounded, committed);
@@ -638,6 +550,7 @@ export class EqualizerWidget {
             max: 12.0,
             value: this._eq.trebleGain,
             step: 0.5,
+            precision: 0.1,
             height: 20,
             trackHeight: 4,
             handleRadius: 5.5,
@@ -651,6 +564,8 @@ export class EqualizerWidget {
         });
 
         this._trebleSlider.connect('value-changed', (_s, val, committed) => {
+            if (this._destroyed)
+                return;
             const rounded = roundToStep(val, 0.1);
             this._trebleValueLabel.text = formatDb(rounded, true, 1);
             this._eq.setTrebleGain(rounded, committed);
@@ -751,6 +666,8 @@ export class EqualizerWidget {
         this._eqSignalIds = [
             this._eq.connect('state-changed', () => this._syncAll()),
             this._eq.connect('presets-changed', () => {
+                if (this._destroyed || !this.actor)
+                    return;
                 this._presetLabel.text = this._eq.activePresetName;
                 if (this._presetDrawer.visible)
                     this._populatePresetDrawer();
@@ -760,6 +677,9 @@ export class EqualizerWidget {
     }
 
     _syncBackendStatus() {
+        if (this._destroyed || !this.actor)
+            return;
+
         const status = this._eq.backendStatus;
         const err = this._eq.backendError;
 
@@ -780,6 +700,9 @@ export class EqualizerWidget {
     }
 
     _syncAll() {
+        if (this._destroyed || !this.actor)
+            return;
+
         this._presetLabel.text = this._eq.activePresetName;
         this._syncBackendStatus();
 
@@ -808,11 +731,14 @@ export class EqualizerWidget {
     }
 
     closeDrawers() {
+        if (this._destroyed || !this.actor)
+            return;
         this._presetDrawer.visible = false;
         this._saveRow.visible = false;
     }
 
     destroy() {
+        this._destroyed = true;
         if (this._eq && this._eqSignalIds) {
             for (const id of this._eqSignalIds)
                 this._eq.disconnect(id);

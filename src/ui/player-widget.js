@@ -27,6 +27,7 @@ export class PlayerWidget {
         this._currentArtUrl = '';
         this._positionTimerId = 0;
         this._popupOpen = false;
+        this._destroyed = false;
 
         this._cacheDir = GLib.build_filenamev([
             GLib.get_user_cache_dir(),
@@ -235,6 +236,7 @@ export class PlayerWidget {
             max: 1.0,
             value: 0.0,
             step: 0.02,
+            precision: 0.0,
             height: 20,
             trackHeight: 4,
             handleRadius: 6,
@@ -383,34 +385,50 @@ export class PlayerWidget {
     _bindSignals() {
         this._mprisSignalIds = [
             this._mpris.connect('active-player-changed', () => {
+                if (this._destroyed || !this.actor)
+                    return;
                 this._syncPlayerState();
                 this._updatePositionTimerState();
             }),
             this._mpris.connect('active-player-updated', () => {
+                if (this._destroyed || !this.actor)
+                    return;
                 this._syncPlayerState();
                 this._updatePositionTimerState();
             }),
             this._mpris.connect('active-position-changed', () => {
+                if (this._destroyed || !this.actor)
+                    return;
                 this._syncProgress();
             }),
             this._mpris.connect('players-changed', () => {
+                if (this._destroyed || !this.actor)
+                    return;
                 this._syncPlayerBadge();
-                if (this._playerDrawer.visible)
+                if (this._playerDrawer?.visible)
                     this._populatePlayerDrawer();
             }),
         ];
 
         this._audioSignalIds = [
-            this._audio.connect('active-device-changed', () => this._syncOutputDevice()),
-            this._audio.connect('devices-changed', () => {
+            this._audio.connect('active-device-changed', () => {
+                if (this._destroyed || !this.actor)
+                    return;
                 this._syncOutputDevice();
-                if (this._outputDrawer.visible)
+            }),
+            this._audio.connect('devices-changed', () => {
+                if (this._destroyed || !this.actor)
+                    return;
+                this._syncOutputDevice();
+                if (this._outputDrawer?.visible)
                     this._populateOutputDrawer();
             }),
         ];
     }
 
     setPopupOpen(isOpen) {
+        if (this._destroyed || !this.actor)
+            return;
         this._popupOpen = Boolean(isOpen);
         if (!this._popupOpen) {
             this._outputDrawer.visible = false;
@@ -584,12 +602,16 @@ export class PlayerWidget {
     }
 
     _syncOutputDevice() {
+        if (this._destroyed || !this.actor || !this._outputIcon || !this._outputLabel)
+            return;
         const active = this._audio.getActiveDevice();
         this._outputIcon.icon_name = active.iconName || 'audio-headphones-symbolic';
         this._outputLabel.text = active.shortLabel || 'Headphones';
     }
 
     _syncPlayerBadge() {
+        if (this._destroyed || !this.actor || !this._playerBadgeButton)
+            return;
         const players = this._mpris.players;
         const active = this._mpris.activePlayer;
 
@@ -607,6 +629,8 @@ export class PlayerWidget {
     }
 
     _syncPlayerState() {
+        if (this._destroyed || !this.actor)
+            return;
         const player = this._mpris.activePlayer;
         this._syncPlayerBadge();
 
@@ -677,6 +701,8 @@ export class PlayerWidget {
     }
 
     _syncProgress() {
+        if (this._destroyed || !this.actor || !this._progressSlider)
+            return;
         const player = this._mpris.activePlayer;
         if (!player)
             return;
@@ -813,20 +839,23 @@ export class PlayerWidget {
     }
 
     _applyCoverFileUri(fileUri) {
-        if (!this._artBox)
+        if (this._destroyed || !this._artBox)
             return;
         this._fallbackArtIcon.visible = false;
         this._artBox.style = `background-image: url("${fileUri}"); background-size: cover; background-position: center;`;
     }
 
     _applyFallbackArt() {
-        if (!this._artBox)
+        if (this._destroyed || !this._artBox)
             return;
         this._artBox.style = null;
         this._fallbackArtIcon.visible = true;
     }
 
     destroy() {
+        this._destroyed = true;
+        this._popupOpen = false;
+
         if (this._positionTimerId) {
             GLib.Source.remove(this._positionTimerId);
             this._positionTimerId = 0;

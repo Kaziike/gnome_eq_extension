@@ -31,6 +31,7 @@ class MusicEqualizerIndicator extends PanelMenu.Button {
         this._eq = equalizerManager;
         this._settings = settings;
         this._extensionPath = extensionPath;
+        this._destroyed = false;
 
         this._buildPanelIndicator();
         this._buildPopupContent();
@@ -123,6 +124,8 @@ class MusicEqualizerIndicator extends PanelMenu.Button {
     }
 
     _syncPanelIndicator() {
+        if (this._destroyed || !this._panelIcon || !this._panelLabel)
+            return;
         const player = this._mpris.activePlayer;
         const showTrack = this._settings.showTrackInPanel;
 
@@ -141,6 +144,8 @@ class MusicEqualizerIndicator extends PanelMenu.Button {
     }
 
     destroy() {
+        this._destroyed = true;
+
         if (this.menu && this._menuOpenSignalId) {
             this.menu.disconnect(this._menuOpenSignalId);
             this._menuOpenSignalId = 0;

@@ -1,35 +1,42 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
-// Music Control & Equalizer - Custom Horizontal Slider & Volume Control Widget
+// Music Control & Equalizer - Shared BaseSlider, HorizontalSlider & Volume Control Widget
 
 import Clutter from 'gi://Clutter';
 import GObject from 'gi://GObject';
 import St from 'gi://St';
-import {clamp} from '../utils/helpers.js';
+import {clamp, roundToStep} from '../utils/helpers.js';
 
 const TAU = Math.PI * 2;
 
 /**
- * Custom Cairo-rendered Horizontal Slider matching the reference UI design
- * (electric blue active fill, dark rounded track, crisp white circular handle).
- * Built specifically for GNOME Shell 50/51 Clutter Gesture & ScrollController APIs.
+ * Shared Base Slider implementing unified Coordinate Mapping, Gain Mapping,
+ * PanGesture Drag Lifecycle, and ScrollController handling for both Horizontal
+ * and Vertical sliders in GNOME Shell 50/51.
  */
-export const HorizontalSlider = GObject.registerClass({
+export const BaseSlider = GObject.registerClass({
     Signals: {
         'value-changed': {param_types: [GObject.TYPE_DOUBLE, GObject.TYPE_BOOLEAN]},
         'drag-begin': {},
         'drag-end': {param_types: [GObject.TYPE_DOUBLE]},
     },
-}, class HorizontalSlider extends St.DrawingArea {
+}, class BaseSlider extends St.DrawingArea {
     _init(params = {}) {
         const {
+            orientation = Clutter.Orientation.HORIZONTAL,
             min = 0.0,
             max = 1.0,
             value = 0.0,
             step = 0.02,
+            precision = 0.0,
+            width = 0,
             height = 22,
-            trackHeight = 4,
+            trackThickness = 4,
             handleRadius = 6,
-            styleClass = 'mce-horizontal-slider',
+            trackPadding = 2,
+            styleClass = 'mce-slider',
+            xExpand = true,
+            xAlign = Clutter.ActorAlign.FILL,
+            yAlign = Clutter.ActorAlign.CENTER,
         } = params;
 
         super._init({
@@ -37,21 +44,48 @@ export const HorizontalSlider = GObject.registerClass({
             reactive: true,
             can_focus: true,
             track_hover: true,
-            x_expand: true,
-            y_align: Clutter.ActorAlign.CENTER,
+            x_expand: xExpand,
+            x_align: xAlign,
+            y_align: yAlign,
         });
 
+        this._orientation = orientation;
         this._min = min;
         this._max = max;
-        this._value = clamp(value, min, max);
         this._step = step;
+        this._precision = precision;
+        this._preferredWidth = width;
         this._preferredHeight = height;
-        this._trackHeight = trackHeight;
+        this._trackThickness = trackThickness;
         this._handleRadius = handleRadius;
+        this._trackPadding = trackPadding;
+
+        this._allocatedWidth = width > 0 ? width : 0;
+        this._allocatedHeight = height > 0 ? height : 0;
+        this._dragMetrics = null;
+        this._grab = null;
         this._dragging = false;
         this._interactive = true;
 
-        this.set_height(this._preferredHeight);
+        this._value = this._sanitizeValue(value);
+
+        if (width > 0 && height > 0)
+            this.set_size(width, height);
+        else if (height > 0)
+            this.set_height(height);
+        else if (width > 0)
+            this.set_width(width);
+
+        this.connect('notify::allocation', () => {
+            if (!this.allocation)
+                return;
+            const w = this.allocation.get_width();
+            const h = this.allocation.get_height();
+            if (w > 0)
+                this._allocatedWidth = w;
+            if (h > 0)
+                this._allocatedHeight = h;
+        });
 
         this._panGesture = new Clutter.PanGesture();
         this._panGesture.set_begin_threshold(0);
@@ -77,6 +111,13 @@ export const HorizontalSlider = GObject.registerClass({
         this.connect('notify::hover', () => this.queue_repaint());
     }
 
+    _sanitizeValue(val) {
+        const clamped = clamp(Number(val), this._min, this._max);
+        if (this._precision > 0)
+            return clamp(roundToStep(clamped, this._precision), this._min, this._max);
+        return clamped;
+    }
+
     get isDragging() {
         return this._dragging;
     }
@@ -86,10 +127,10 @@ export const HorizontalSlider = GObject.registerClass({
     }
 
     set value(val) {
-        const clamped = clamp(Number(val), this._min, this._max);
-        if (Math.abs(this._value - clamped) < 1e-6)
+        const sanitized = this._sanitizeValue(val);
+        if (Math.abs(this._value - sanitized) < 1e-6)
             return;
-        this._value = clamped;
+        this._value = sanitized;
         this.queue_repaint();
     }
 
@@ -99,29 +140,161 @@ export const HorizontalSlider = GObject.registerClass({
         this.queue_repaint();
     }
 
-    _xToValue(x) {
-        const [width] = this.get_surface_size();
-        const pad = this._handleRadius + 2;
-        const usable = Math.max(1, width - pad * 2);
-        const ratio = clamp((x - pad) / usable, 0.0, 1.0);
-        return this._min + ratio * (this._max - this._min);
+    /**
+     * Safely retrieve actor dimensions outside vfunc_repaint() without calling
+     * st_drawing_area_get_surface_size() (which asserts priv->in_repaint).
+     *
+     * @returns {[number, number]}
+     */
+    _getActorDimensions() {
+        let allocW = 0;
+        let allocH = 0;
+        if (this.allocation) {
+            allocW = this.allocation.get_width();
+            allocH = this.allocation.get_height();
+        }
+
+        const width = allocW > 0
+            ? allocW
+            : (this._allocatedWidth > 0
+                ? this._allocatedWidth
+                : Math.max(1, this.width || this._preferredWidth || 100));
+
+        const height = allocH > 0
+            ? allocH
+            : (this._allocatedHeight > 0
+                ? this._allocatedHeight
+                : Math.max(1, this.height || this._preferredHeight || 100));
+
+        return [width, height];
+    }
+
+    /**
+     * Compute track bounds and usable drag length in actor-local coordinates.
+     *
+     * @param {number|null} [width=null]
+     * @param {number|null} [height=null]
+     */
+    getTrackMetrics(width = null, height = null) {
+        if (width === null || height === null || width <= 0 || height <= 0)
+            [width, height] = this._getActorDimensions();
+
+        const pad = this._handleRadius + this._trackPadding;
+
+        if (this._orientation === Clutter.Orientation.VERTICAL) {
+            const trackTop = pad;
+            const trackBottom = Math.max(trackTop + 1, height - pad);
+            const trackHeight = Math.max(1, trackBottom - trackTop);
+            return {
+                width,
+                height,
+                pad,
+                trackTop,
+                trackBottom,
+                trackHeight,
+                trackStart: trackTop,
+                trackEnd: trackBottom,
+                trackLength: trackHeight,
+            };
+        } else {
+            const trackLeft = pad;
+            const trackRight = Math.max(trackLeft + 1, width - pad);
+            const trackWidth = Math.max(1, trackRight - trackLeft);
+            return {
+                width,
+                height,
+                pad,
+                trackLeft,
+                trackRight,
+                trackWidth,
+                trackStart: trackLeft,
+                trackEnd: trackRight,
+                trackLength: trackWidth,
+            };
+        }
+    }
+
+    /**
+     * Unified mapping formula from local pointer coordinates to Slider Value/Gain:
+     * Vertical:   normalized = clamp((trackBottom - pointerY) / trackHeight, 0, 1)
+     * Horizontal: normalized = clamp((pointerX - trackLeft) / trackWidth, 0, 1)
+     * value = min + normalized * (max - min)
+     *
+     * @param {number} pointerX
+     * @param {number} pointerY
+     * @param {object|null} [metrics=null]
+     * @returns {number}
+     */
+    mapPointerToValue(pointerX, pointerY, metrics = null) {
+        const m = metrics || this._dragMetrics || this.getTrackMetrics();
+        let normalized;
+
+        if (this._orientation === Clutter.Orientation.VERTICAL)
+            normalized = clamp((m.trackBottom - pointerY) / m.trackHeight, 0.0, 1.0);
+        else
+            normalized = clamp((pointerX - m.trackLeft) / m.trackWidth, 0.0, 1.0);
+
+        const raw = this._min + normalized * (this._max - this._min);
+        return this._sanitizeValue(raw);
+    }
+
+    /**
+     * Exact inverse of mapPointerToValue: maps current value to thumb center coordinate.
+     *
+     * @param {number} width
+     * @param {number} height
+     * @returns {{coord: number, metrics: object, normalized: number}}
+     */
+    mapValueToCoord(width, height) {
+        const m = this.getTrackMetrics(width, height);
+        const range = Math.max(1e-6, this._max - this._min);
+        const normalized = clamp((this._value - this._min) / range, 0.0, 1.0);
+
+        const coord = this._orientation === Clutter.Orientation.VERTICAL
+            ? m.trackBottom - normalized * m.trackHeight
+            : m.trackLeft + normalized * m.trackWidth;
+
+        return {coord, metrics: m, normalized};
     }
 
     _setValueFromUser(nextVal, committed) {
-        const clamped = clamp(nextVal, this._min, this._max);
-        this._value = clamped;
+        const sanitized = this._sanitizeValue(nextVal);
+        this._value = sanitized;
         this.queue_repaint();
         this.emit('value-changed', this._value, Boolean(committed));
+    }
+
+    _releaseGrab() {
+        if (this._grab) {
+            try {
+                this._grab.dismiss();
+            } catch (_e) {
+                // Ignore if already dismissed
+            }
+            this._grab = null;
+        }
     }
 
     _onPanBegin() {
         if (!this._interactive)
             return Clutter.EVENT_PROPAGATE;
 
+        this._releaseGrab();
+        if (typeof global !== 'undefined' && global.stage?.grab) {
+            try {
+                this._grab = global.stage.grab(this);
+            } catch (_e) {
+                this._grab = null;
+            }
+        }
+
+        // Lock track geometry at drag start so external layout updates cannot distort drag coordinates
+        this._dragMetrics = this.getTrackMetrics();
         this._dragging = true;
         this.emit('drag-begin');
+
         const coords = this._panGesture.get_centroid();
-        this._setValueFromUser(this._xToValue(coords.x), false);
+        this._setValueFromUser(this.mapPointerToValue(coords.x, coords.y, this._dragMetrics), false);
         return Clutter.EVENT_STOP;
     }
 
@@ -130,10 +303,13 @@ export const HorizontalSlider = GObject.registerClass({
             return;
 
         const coords = this._panGesture.get_centroid();
-        this._setValueFromUser(this._xToValue(coords.x), false);
+        this._setValueFromUser(this.mapPointerToValue(coords.x, coords.y, this._dragMetrics), false);
     }
 
     _onPanEnd() {
+        this._releaseGrab();
+        this._dragMetrics = null;
+
         if (!this._dragging)
             return;
 
@@ -141,6 +317,63 @@ export const HorizontalSlider = GObject.registerClass({
         this.queue_repaint();
         this.emit('value-changed', this._value, true);
         this.emit('drag-end', this._value);
+    }
+
+    vfunc_unmap() {
+        if (this._dragging || this._grab) {
+            this._releaseGrab();
+            this._dragMetrics = null;
+            this._dragging = false;
+        }
+        super.vfunc_unmap();
+    }
+
+    _drawRoundedBar(cr, x, y, w, h, r) {
+        const radius = Math.min(r, w / 2, h / 2);
+        cr.newSubPath();
+        cr.arc(x + w - radius, y + radius, radius, -Math.PI / 2, 0);
+        cr.arc(x + w - radius, y + h - radius, radius, 0, Math.PI / 2);
+        cr.arc(x + radius, y + h - radius, radius, Math.PI / 2, Math.PI);
+        cr.arc(x + radius, y + radius, radius, Math.PI, Math.PI * 1.5);
+        cr.closePath();
+    }
+});
+
+/**
+ * Custom Cairo-rendered Horizontal Slider matching the reference UI design
+ * (electric blue active fill, dark rounded track, crisp white circular handle).
+ */
+export const HorizontalSlider = GObject.registerClass(
+class HorizontalSlider extends BaseSlider {
+    _init(params = {}) {
+        const {
+            min = 0.0,
+            max = 1.0,
+            value = 0.0,
+            step = 0.02,
+            precision = 0.0,
+            height = 22,
+            trackHeight = 4,
+            handleRadius = 6,
+            styleClass = 'mce-horizontal-slider',
+        } = params;
+
+        super._init({
+            orientation: Clutter.Orientation.HORIZONTAL,
+            min,
+            max,
+            value,
+            step,
+            precision,
+            height,
+            trackThickness: trackHeight,
+            handleRadius,
+            trackPadding: 2,
+            styleClass,
+            xExpand: true,
+            xAlign: Clutter.ActorAlign.FILL,
+            yAlign: Clutter.ActorAlign.CENTER,
+        });
     }
 
     vfunc_repaint() {
@@ -152,36 +385,34 @@ export const HorizontalSlider = GObject.registerClass({
             return;
         }
 
-        const pad = this._handleRadius + 2;
-        const usableWidth = Math.max(1, width - pad * 2);
-        const centerY = height / 2;
-        const trackRadius = this._trackHeight / 2;
+        this._allocatedWidth = width;
+        this._allocatedHeight = height;
 
-        const range = Math.max(1e-6, this._max - this._min);
-        const fraction = clamp((this._value - this._min) / range, 0.0, 1.0);
-        const handleX = pad + usableWidth * fraction;
+        const {coord: handleX, metrics: m} = this.mapValueToCoord(width, height);
+        const centerY = height / 2;
+        const trackRadius = this._trackThickness / 2;
 
         // 1. Background Track (Dark translucent pill)
         this._drawRoundedBar(
             cr,
-            pad,
+            m.trackLeft,
             centerY - trackRadius,
-            usableWidth,
-            this._trackHeight,
+            m.trackWidth,
+            this._trackThickness,
             trackRadius
         );
         cr.setSourceRGBA(1.0, 1.0, 1.0, 0.16);
         cr.fill();
 
         // 2. Active Track Fill (Electric Blue #257ef9)
-        const activeWidth = Math.max(0, handleX - pad);
+        const activeWidth = Math.max(0, handleX - m.trackLeft);
         if (activeWidth > 0.5) {
             this._drawRoundedBar(
                 cr,
-                pad,
+                m.trackLeft,
                 centerY - trackRadius,
                 activeWidth,
-                this._trackHeight,
+                this._trackThickness,
                 trackRadius
             );
             cr.setSourceRGBA(0.145, 0.494, 0.976, 1.0);
@@ -211,16 +442,6 @@ export const HorizontalSlider = GObject.registerClass({
 
         cr.$dispose();
     }
-
-    _drawRoundedBar(cr, x, y, w, h, r) {
-        const radius = Math.min(r, w / 2, h / 2);
-        cr.newSubPath();
-        cr.arc(x + w - radius, y + radius, radius, -Math.PI / 2, 0);
-        cr.arc(x + w - radius, y + h - radius, radius, 0, Math.PI / 2);
-        cr.arc(x + radius, y + h - radius, radius, Math.PI / 2, Math.PI);
-        cr.arc(x + radius, y + radius, radius, Math.PI, Math.PI * 1.5);
-        cr.closePath();
-    }
 });
 
 /**
@@ -232,6 +453,7 @@ export class VolumeWidget {
      */
     constructor(audioController) {
         this._audio = audioController;
+        this._destroyed = false;
 
         this.actor = new St.BoxLayout({
             style_class: 'mce-volume-row',
@@ -261,14 +483,18 @@ export class VolumeWidget {
             max: 1.0,
             value: clamp(this._audio.getVolume(), 0.0, 1.0),
             step: 0.03,
+            precision: 0.0,
             height: 22,
             trackHeight: 4,
             handleRadius: 6,
         });
 
         this._slider.connect('value-changed', (_slider, val) => {
+            if (this._destroyed)
+                return;
             this._audio.setVolume(val);
-            this._volumeIcon.icon_name = this._audio.getVolumeIconName();
+            if (this._volumeIcon)
+                this._volumeIcon.icon_name = this._audio.getVolumeIconName();
         });
 
         this.actor.add_child(this._muteButton);
@@ -282,16 +508,21 @@ export class VolumeWidget {
     }
 
     _syncFromAudio() {
+        if (this._destroyed || !this.actor || !this._volumeIcon || !this._slider)
+            return;
         this._volumeIcon.icon_name = this._audio.getVolumeIconName();
         if (!this._slider.isDragging)
             this._slider.value = clamp(this._audio.getVolume(), 0.0, 1.0);
     }
 
     destroy() {
+        this._destroyed = true;
         if (this._audio && this._audioSignalId) {
             this._audio.disconnect(this._audioSignalId);
             this._audioSignalId = 0;
         }
+        this._volumeIcon = null;
+        this._slider = null;
         this.actor?.destroy();
         this.actor = null;
     }
