@@ -6,8 +6,8 @@ import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import Gtk from 'gi://Gtk';
 
-import {ExtensionPreferences} from 'resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js';
-import {BUILTIN_PRESETS, BUILTIN_PRESET_ORDER} from './src/audio/presets.js';
+import { ExtensionPreferences } from 'resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js';
+import { BUILTIN_PRESETS, BUILTIN_PRESET_ORDER } from './src/audio/presets.js';
 import {
     VALID_LAYOUT_MODES,
     VALID_POPUP_SCALES,
@@ -32,7 +32,7 @@ export default class MusicControlEqualizerPreferences extends ExtensionPreferenc
         // 1. Layout Mode Selection Group
         const layoutGroup = new Adw.PreferencesGroup({
             title: 'Popup Layout Mode',
-            description: 'Switch between 5 built-in popup layouts in real time without restarting GNOME Shell.',
+            description: 'Switch popup layouts.',
         });
         interfacePage.add(layoutGroup);
 
@@ -48,7 +48,7 @@ export default class MusicControlEqualizerPreferences extends ExtensionPreferenc
 
         const layoutRow = new Adw.ComboRow({
             title: 'Active Interface Layout',
-            subtitle: 'Dual Panel is the default side-by-side workspace layout',
+            subtitle: 'Dual Panel is the default',
             model: layoutLabels,
         });
 
@@ -72,8 +72,7 @@ export default class MusicControlEqualizerPreferences extends ExtensionPreferenc
 
         // 2. Dimensions & Sizing Group
         const sizeGroup = new Adw.PreferencesGroup({
-            title: 'Popup Size & Panel Widths',
-            description: 'Customize overall popup scale and individual panel widths (Left 1/3 Music, Right 2/3 Equalizer).',
+            title: 'Popup Size and Panel Widths',
         });
         interfacePage.add(sizeGroup);
 
@@ -110,8 +109,8 @@ export default class MusicControlEqualizerPreferences extends ExtensionPreferenc
             value: settings.get_int('left-panel-width'),
         });
         const leftWidthRow = new Adw.SpinRow({
-            title: 'Music & Media Panel Width (px)',
-            subtitle: 'Width of the left panel in Dual Panel layout (default: 310 px)',
+            title: 'Music and Media Panel Width (px)',
+            subtitle: 'Width of the left panel layout (default: 310 px)',
             adjustment: leftWidthAdj,
         });
         settings.bind(
@@ -131,7 +130,7 @@ export default class MusicControlEqualizerPreferences extends ExtensionPreferenc
         });
         const rightWidthRow = new Adw.SpinRow({
             title: 'Equalizer Panel Width (px)',
-            subtitle: 'Width of the right panel in Dual Panel layout (default: 560 px)',
+            subtitle: 'Width of the right panel layout (default: 560 px)',
             adjustment: rightWidthAdj,
         });
         settings.bind(
@@ -151,21 +150,21 @@ export default class MusicControlEqualizerPreferences extends ExtensionPreferenc
 
         const albumArtRow = new Adw.SwitchRow({
             title: 'Show Album Art',
-            subtitle: 'Display cover artwork in the Music & Media header',
+            subtitle: 'Display cover artwork in the Music and Media header',
         });
         settings.bind('show-album-art', albumArtRow, 'active', Gio.SettingsBindFlags.DEFAULT);
         visibilityGroup.add(albumArtRow);
 
         const mediaSourceRow = new Adw.SwitchRow({
             title: 'Show Media Source Card',
-            subtitle: 'Display current stream source (e.g. Spotify, YouTube Video, Brave, VLC) at the bottom of the Music panel',
+            subtitle: 'Display current stream source',
         });
         settings.bind('show-media-source', mediaSourceRow, 'active', Gio.SettingsBindFlags.DEFAULT);
         visibilityGroup.add(mediaSourceRow);
 
         const bassTrebleRow = new Adw.SwitchRow({
-            title: 'Show Bass & Treble Controls',
-            subtitle: 'Display Bass and Treble shelf sliders below the 10-band Equalizer',
+            title: 'Show Bass and Treble Controls',
+            subtitle: 'Display Bass and Treble shelf',
         });
         settings.bind('show-bass-treble', bassTrebleRow, 'active', Gio.SettingsBindFlags.DEFAULT);
         visibilityGroup.add(bassTrebleRow);
@@ -177,10 +176,10 @@ export default class MusicControlEqualizerPreferences extends ExtensionPreferenc
         settings.bind('show-time-info', timeInfoRow, 'active', Gio.SettingsBindFlags.DEFAULT);
         visibilityGroup.add(timeInfoRow);
 
-        // 4. Theme, Accent Color & Glassmorphism Opacity Group
+        // 4. Theme, Accent Color & Opacity Group
         const themeGroup = new Adw.PreferencesGroup({
-            title: 'Theme, Accent Color & Glassmorphism',
-            description: 'Customize accent color and dark glassmorphic background opacity.',
+            title: 'Theme, Accent Color  Opacity',
+            description: 'Customize accent color and dark background opacity.',
         });
         interfacePage.add(themeGroup);
 
@@ -207,7 +206,7 @@ export default class MusicControlEqualizerPreferences extends ExtensionPreferenc
         themeGroup.add(accentRow);
 
         const opacityAdj = new Gtk.Adjustment({
-            lower: 65,
+            lower: 25,
             upper: 100,
             step_increment: 1,
             page_increment: 5,
@@ -215,7 +214,7 @@ export default class MusicControlEqualizerPreferences extends ExtensionPreferenc
         });
         const opacityRow = new Adw.SpinRow({
             title: 'Popup Background Opacity (%)',
-            subtitle: 'Adjust dark glassmorphic transparency (65% translucent to 100% solid)',
+            subtitle: 'Adjust dark transparency (25% translucent to 100% solid)',
             adjustment: opacityAdj,
         });
         settings.bind(
@@ -229,7 +228,7 @@ export default class MusicControlEqualizerPreferences extends ExtensionPreferenc
         // Restore Default Interface Button
         const restoreUiGroup = new Adw.PreferencesGroup({
             title: 'Restore Default Interface',
-            description: 'Reset layout, panel sizes, visibility toggles, and theme back to Dual Panel defaults without touching Equalizer presets.',
+            description: 'Reset layout, panel sizes, visibility toggles, and theme back defaults.',
         });
         interfacePage.add(restoreUiGroup);
 
@@ -259,8 +258,7 @@ export default class MusicControlEqualizerPreferences extends ExtensionPreferenc
 
         // 1. Panel & Player Preferences Group
         const panelGroup = new Adw.PreferencesGroup({
-            title: 'Top Bar & Media Player',
-            description: 'Configure how the indicator and media player behave on the GNOME Top Bar.',
+            title: 'Top Bar and Media Player',
         });
         audioPage.add(panelGroup);
 
@@ -309,7 +307,7 @@ export default class MusicControlEqualizerPreferences extends ExtensionPreferenc
         // 2. PipeWire System-Wide Equalizer Group
         const eqGroup = new Adw.PreferencesGroup({
             title: 'System-Wide PipeWire Equalizer',
-            description: 'Real-time 10-band biquad DSP filter chain + Bass & Treble shelf filters via PipeWire.',
+            description: '10-band biquad DSP filter chain + Bass and Treble shelf.',
         });
         audioPage.add(eqGroup);
 
@@ -326,7 +324,7 @@ export default class MusicControlEqualizerPreferences extends ExtensionPreferenc
         eqGroup.add(eqEnabledRow);
 
         const presetNames = BUILTIN_PRESET_ORDER.map(id => BUILTIN_PRESETS[id].name);
-        const presetModel = new Gtk.StringList({strings: presetNames});
+        const presetModel = new Gtk.StringList({ strings: presetNames });
         const presetRow = new Adw.ComboRow({
             title: 'Default Built-in Preset',
             subtitle: 'Quickly apply one of the built-in acoustic presets',
@@ -352,7 +350,7 @@ export default class MusicControlEqualizerPreferences extends ExtensionPreferenc
 
         // 3. Reset & Restore Group
         const resetGroup = new Adw.PreferencesGroup({
-            title: 'Maintenance & Reset',
+            title: 'Maintenance and Reset',
             description: 'Restore equalizer gains or reset all extension configuration to defaults.',
         });
         audioPage.add(resetGroup);

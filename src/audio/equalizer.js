@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Music Control & Equalizer - Equalizer State & Preset Controller
 
-import {EventEmitter} from 'resource:///org/gnome/shell/misc/signals.js';
+import { EventEmitter } from 'resource:///org/gnome/shell/misc/signals.js';
 import {
     EQ_BANDS,
     BUILTIN_PRESETS,
     BUILTIN_PRESET_ORDER,
     DEFAULT_BAND_COUNT,
 } from './presets.js';
-import {PipeWireEqBackend} from './pipewire.js';
-import {clamp, roundToStep} from '../utils/helpers.js';
+import { PipeWireEqBackend } from './pipewire.js';
+import { clamp, roundToStep } from '../utils/helpers.js';
 
 export class EqualizerManager extends EventEmitter {
     /**
@@ -192,7 +192,7 @@ export class EqualizerManager extends EventEmitter {
     }
 
     /**
-     * Update a single frequency band gain in real time.
+     * Update a single frequency band gain.
      *
      * @param {number} index 0..9
      * @param {number} gainDb -12.0..+12.0
@@ -222,7 +222,7 @@ export class EqualizerManager extends EventEmitter {
     }
 
     /**
-     * Update Bass shelf gain in real time.
+     * Update Bass shelf gain.
      *
      * @param {number} gainDb -12.0..+12.0
      * @param {boolean} [commitToSettings=true]
@@ -246,7 +246,7 @@ export class EqualizerManager extends EventEmitter {
     }
 
     /**
-     * Update Treble shelf gain in real time.
+     * Update Treble shelf gain.
      *
      * @param {number} gainDb -12.0..+12.0
      * @param {boolean} [commitToSettings=true]

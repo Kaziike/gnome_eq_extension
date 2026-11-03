@@ -123,10 +123,10 @@
     </key>
 
     <key name="popup-opacity" type="i">
-      <default>94</default>
-      <range min="65" max="100"/>
+      <default>65</default>
+      <range min="25" max="100"/>
       <summary>Popup background opacity percentage</summary>
-      <description>Background opacity of the dark glassmorphic popup container (65% to 100%).</description>
+      <description>Background opacity of the dark glassmorphic popup container (25% to 100%).</description>
     </key>
 
   </schema>

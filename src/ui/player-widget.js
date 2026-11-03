@@ -7,8 +7,8 @@ import GLib from 'gi://GLib';
 import Pango from 'gi://Pango';
 import St from 'gi://St';
 
-import {HorizontalSlider} from './volume-widget.js';
-import {clamp, formatDuration, parseAccentColor, Logger} from '../utils/helpers.js';
+import { HorizontalSlider } from './volume-widget.js';
+import { clamp, formatDuration, parseAccentColor, Logger } from '../utils/helpers.js';
 
 export class PlayerWidget {
     /**
@@ -355,7 +355,7 @@ export class PlayerWidget {
         });
 
         this._sourceTitleLabel = new St.Label({
-            text: 'No Active Media Source',
+            text: 'No Media Source',
             style_class: 'mce-media-source-title',
             x_align: Clutter.ActorAlign.START,
         });
@@ -403,7 +403,7 @@ export class PlayerWidget {
         });
         button.set_child(icon);
         button.connect('clicked', onClick);
-        return {button, icon};
+        return { button, icon };
     }
 
     _bindSignals() {
@@ -643,8 +643,8 @@ export class PlayerWidget {
         this._syncPlayerBadge();
 
         if (!player) {
-            this._titleLabel.text = 'No Active Media Player';
-            this._artistLabel.text = 'Play music in Spotify, Brave, Firefox, or VLC';
+            this._titleLabel.text = 'No Media Player';
+            this._artistLabel.text = '-';
             this._setAlbumArt('');
             this._playPauseIcon.icon_name = 'media-playback-start-symbolic';
             this._shuffleBtn.button.remove_style_class_name('active');
@@ -702,8 +702,8 @@ export class PlayerWidget {
             return;
 
         if (!player) {
-            this._sourceTitleLabel.text = 'No Active Media Source';
-            this._sourceDetailLabel.text = 'Waiting for MPRIS stream…';
+            this._sourceTitleLabel.text = 'No Media Source';
+            this._sourceDetailLabel.text = '-';
             this._sourceIcon.icon_name = 'audio-x-generic-symbolic';
             this._sourceIcon.visible = true;
             this._sourceThumbBin.style = null;

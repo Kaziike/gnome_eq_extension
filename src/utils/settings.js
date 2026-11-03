@@ -2,8 +2,8 @@
 // Music Control & Equalizer - GSettings Wrapper
 
 import GLib from 'gi://GLib';
-import {clamp, roundToStep, slugifyPresetName, Logger} from './helpers.js';
-import {BUILTIN_PRESETS, DEFAULT_BAND_COUNT} from '../audio/presets.js';
+import { clamp, roundToStep, slugifyPresetName, Logger } from './helpers.js';
+import { BUILTIN_PRESETS, DEFAULT_BAND_COUNT } from '../audio/presets.js';
 
 export const LayoutMode = {
     DUAL_PANEL: 'dual-panel',
@@ -24,12 +24,12 @@ export const VALID_LAYOUT_MODES = [
 export const VALID_POPUP_SCALES = ['small', 'medium', 'large'];
 
 export const ACCENT_PRESETS = [
-    {id: '#257ef9', name: 'Electric Blue (Default)'},
-    {id: '#00c4cc', name: 'Cyan Glow'},
-    {id: '#8b5cf6', name: 'Royal Purple'},
-    {id: '#10b981', name: 'Emerald Green'},
-    {id: '#f59e0b', name: 'Amber Gold'},
-    {id: '#ec4899', name: 'Neon Rose'},
+    { id: '#257ef9', name: 'Electric Blue (Default)' },
+    { id: '#00c4cc', name: 'Cyan Glow' },
+    { id: '#8b5cf6', name: 'Royal Purple' },
+    { id: '#10b981', name: 'Emerald Green' },
+    { id: '#f59e0b', name: 'Amber Gold' },
+    { id: '#ec4899', name: 'Neon Rose' },
 ];
 
 export const INTERFACE_SETTING_KEYS = [
@@ -238,11 +238,11 @@ export class SettingsManager {
     }
 
     get popupOpacity() {
-        return clamp(this._settings.get_int('popup-opacity'), 65, 100);
+        return clamp(this._settings.get_int('popup-opacity'), 25, 100);
     }
 
     set popupOpacity(value) {
-        this._settings.set_int('popup-opacity', Math.round(clamp(Number(value), 65, 100)));
+        this._settings.set_int('popup-opacity', Math.round(clamp(Number(value), 25, 100)));
     }
 
     /**

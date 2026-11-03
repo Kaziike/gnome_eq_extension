@@ -4,10 +4,10 @@
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import Gvc from 'gi://Gvc';
-import {EventEmitter} from 'resource:///org/gnome/shell/misc/signals.js';
+import { EventEmitter } from 'resource:///org/gnome/shell/misc/signals.js';
 
-import {EQ_BANDS, BASS_NODE, TREBLE_NODE} from './presets.js';
-import {clamp, roundToStep, shortenDeviceName, Logger} from '../utils/helpers.js';
+import { EQ_BANDS, BASS_NODE, TREBLE_NODE } from './presets.js';
+import { clamp, roundToStep, shortenDeviceName, Logger } from '../utils/helpers.js';
 
 export const BackendStatus = {
     DISABLED: 'disabled',
@@ -349,7 +349,7 @@ ${links.join('\n')}
     }
 
     /**
-     * Update Equalizer 10-band gains + Bass + Treble gains in real time.
+     * Update Equalizer 10-band gains + Bass + Treble gains.
      *
      * @param {number[]} bandGains
      * @param {number} bassGain
@@ -699,7 +699,7 @@ export class SystemAudioController extends EventEmitter {
     }
 
     /**
-     * Get current normalized volume between 0.0 and 1.0 (or up to 1.5 if amplified).
+     * Get current normalized volume between 0.0 and 1.0.
      *
      * @returns {number}
      */
@@ -805,7 +805,7 @@ export class SystemAudioController extends EventEmitter {
 
     getActiveDevice() {
         if (this._activeDeviceId !== null && this._devices.has(this._activeDeviceId))
-            return {...this._devices.get(this._activeDeviceId), isActive: true};
+            return { ...this._devices.get(this._activeDeviceId), isActive: true };
 
         if (this._stream) {
             const desc = this._stream.get_description() || 'Speakers';

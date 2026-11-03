@@ -10,8 +10,8 @@
 import Clutter from 'gi://Clutter';
 import St from 'gi://St';
 
-import {LayoutMode} from '../utils/settings.js';
-import {clamp} from '../utils/helpers.js';
+import { LayoutMode } from '../utils/settings.js';
+import { clamp } from '../utils/helpers.js';
 
 export class PopupLayoutManager {
     /**
@@ -22,7 +22,7 @@ export class PopupLayoutManager {
      * @param {import('./equalizer-widget.js').EqualizerWidget} params.equalizerPanel
      * @param {import('../utils/settings.js').SettingsManager} params.settings
      */
-    constructor({rootContainer, popupBox, musicPanel, equalizerPanel, settings}) {
+    constructor({ rootContainer, popupBox, musicPanel, equalizerPanel, settings }) {
         this._root = rootContainer;
         this._popupBox = popupBox;
         this._musicPanel = musicPanel;
@@ -75,7 +75,7 @@ export class PopupLayoutManager {
         } catch (_e) {
             // Fallback to safe defaults
         }
-        return {maxWidth: maxW, maxHeight: maxH};
+        return { maxWidth: maxW, maxHeight: maxH };
     }
 
     /**
@@ -89,8 +89,8 @@ export class PopupLayoutManager {
         const mode = this._settings.layoutMode;
         const scale = this._settings.popupScaleFactor;
         const opacityPct = this._settings.popupOpacity;
-        const alpha = clamp(opacityPct / 100, 0.65, 1.0).toFixed(2);
-        const {maxWidth} = this._getMonitorWorkAreaBounds();
+        const alpha = clamp(opacityPct / 100, 0.25, 1.0).toFixed(2);
+        const { maxWidth } = this._getMonitorWorkAreaBounds();
 
         // Update popup background glassmorphism opacity
         if (this._popupBox) {
@@ -118,30 +118,30 @@ export class PopupLayoutManager {
         const rawRightW = Math.round(this._settings.rightPanelWidth * scale);
 
         switch (mode) {
-        case LayoutMode.DUAL_PANEL:
-            this._applyDualPanelLayout(rawLeftW, rawRightW, maxWidth);
-            break;
-        case LayoutMode.VERTICAL:
-            this._applyVerticalLayout(rawLeftW, rawRightW, maxWidth);
-            break;
-        case LayoutMode.COMPACT:
-            this._applyCompactLayout(rawLeftW, rawRightW, maxWidth);
-            break;
-        case LayoutMode.MUSIC_ONLY:
-            this._applyMusicOnlyLayout(rawLeftW, maxWidth);
-            break;
-        case LayoutMode.EQ_ONLY:
-            this._applyEqOnlyLayout(rawRightW, maxWidth);
-            break;
-        default:
-            this._applyDualPanelLayout(rawLeftW, rawRightW, maxWidth);
-            break;
+            case LayoutMode.DUAL_PANEL:
+                this._applyDualPanelLayout(rawLeftW, rawRightW, maxWidth);
+                break;
+            case LayoutMode.VERTICAL:
+                this._applyVerticalLayout(rawLeftW, rawRightW, maxWidth);
+                break;
+            case LayoutMode.COMPACT:
+                this._applyCompactLayout(rawLeftW, rawRightW, maxWidth);
+                break;
+            case LayoutMode.MUSIC_ONLY:
+                this._applyMusicOnlyLayout(rawLeftW, maxWidth);
+                break;
+            case LayoutMode.EQ_ONLY:
+                this._applyEqOnlyLayout(rawRightW, maxWidth);
+                break;
+            default:
+                this._applyDualPanelLayout(rawLeftW, rawRightW, maxWidth);
+                break;
         }
     }
 
     /**
      * Layout 1 – Dual Panel (Default):
-     * Left: Music & Media (~1/3 square panel) | Right: Equalizer (~2/3 rectangular panel)
+     * Left: Music & Media | Right: Equalizer
      */
     _applyDualPanelLayout(leftW, rightW, maxWidth) {
         this._root.add_style_class_name('mce-layout-dual-panel');

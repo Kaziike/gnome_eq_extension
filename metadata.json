@@ -3,9 +3,6 @@
   "name": "Music Control & Equalizer",
   "description": "Control MPRIS media players and adjust system-wide audio in real time with a 10-band PipeWire Equalizer, Bass & Treble controls, and customizable presets.",
   "shell-version": [
-    "48",
-    "49",
-    "50",
     "51"
   ],
   "settings-schema": "org.gnome.shell.extensions.music-control-equalizer",

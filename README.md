@@ -1,6 +1,6 @@
 # Music Control & Equalizer — GNOME Shell Extension
 
-A native GNOME Shell Extension for **Arch Linux** (GNOME Shell 48–51) that integrates a dark glassmorphic **MPRIS Media Controller** and a real-time **System-Wide 10-Band PipeWire Equalizer** with dedicated **Bass & Treble** DSP filters directly into the GNOME Top Bar.
+A native GNOME Shell Extension for GNOME Shell that integrates a dark glassmorphic **MPRIS Media Controller** and a real-time **System-Wide 10-Band PipeWire Equalizer** with dedicated **Bass & Treble** DSP filters directly into the GNOME Top Bar.
 
 ---
 
@@ -59,9 +59,6 @@ Extension-music/
 │   ├── music-note-symbolic.svg
 │   ├── bass-knob-symbolic.svg
 │   └── treble-clef-symbolic.svg
-├── docs/
-│   ├── plan.md                 # Design & architecture requirements
-│   └── fix.md                  # Bug investigations & fix documentation
 ├── .gitignore
 ├── README.md
 └── LICENSE
@@ -86,7 +83,7 @@ wpctl status
 
 ---
 
-## 4. Installation on Arch Linux
+## 4. Installation
 
 ### Option A: Direct Installation to Local Extensions Directory
 

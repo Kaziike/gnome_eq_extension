@@ -1,0 +1,133 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist gettext-domain="music-control-equalizer">
+  <schema id="org.gnome.shell.extensions.music-control-equalizer"
+          path="/org/gnome/shell/extensions/music-control-equalizer/">
+
+    <key name="equalizer-enabled" type="b">
+      <default>true</default>
+      <summary>Enable system-wide PipeWire equalizer</summary>
+      <description>Whether the real-time PipeWire filter-chain equalizer backend is active.</description>
+    </key>
+
+    <key name="active-preset" type="s">
+      <default>'flat'</default>
+      <summary>Active equalizer preset ID</summary>
+      <description>Identifier of the currently selected equalizer preset.</description>
+    </key>
+
+    <key name="band-gains" type="ad">
+      <default>[0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]</default>
+      <summary>10-band equalizer gain values in dB</summary>
+      <description>Gain values in dB (-12.0 to +12.0) for 32Hz, 64Hz, 125Hz, 250Hz, 500Hz, 1kHz, 2kHz, 4kHz, 8kHz, and 16kHz.</description>
+    </key>
+
+    <key name="bass-gain" type="d">
+      <default>0.0</default>
+      <range min="-12.0" max="12.0"/>
+      <summary>Bass boost/cut gain in dB</summary>
+      <description>Low-shelf biquad filter gain at 100Hz in dB (-12.0 to +12.0).</description>
+    </key>
+
+    <key name="treble-gain" type="d">
+      <default>0.0</default>
+      <range min="-12.0" max="12.0"/>
+      <summary>Treble boost/cut gain in dB</summary>
+      <description>High-shelf biquad filter gain at 10kHz in dB (-12.0 to +12.0).</description>
+    </key>
+
+    <key name="custom-presets" type="s">
+      <default>'{}'</default>
+      <summary>User-defined custom presets JSON</summary>
+      <description>JSON object mapping custom preset IDs to their name, 10 band gains, bass gain, and treble gain.</description>
+    </key>
+
+    <key name="preferred-player" type="s">
+      <default>''</default>
+      <summary>Preferred MPRIS player bus name</summary>
+      <description>The D-Bus name of the user's last selected MPRIS media player.</description>
+    </key>
+
+    <key name="show-remaining-time" type="b">
+      <default>true</default>
+      <summary>Show remaining track duration</summary>
+      <description>If true, displays remaining track time (-MM:SS); otherwise displays total track duration (MM:SS).</description>
+    </key>
+
+    <key name="show-track-in-panel" type="b">
+      <default>false</default>
+      <summary>Show current track title in Top Bar</summary>
+      <description>Whether to display the currently playing track title next to the Top Bar icon.</description>
+    </key>
+
+    <key name="panel-position" type="s">
+      <default>'right'</default>
+      <summary>Top Bar indicator position</summary>
+      <description>Where to place the indicator on the GNOME Top Bar: left, center, or right.</description>
+    </key>
+
+    <!-- Interface Customization Keys -->
+    <key name="layout-mode" type="s">
+      <default>'dual-panel'</default>
+      <summary>Popup interface layout mode</summary>
+      <description>Layout mode for the popup interface: dual-panel, vertical, compact, music-only, or eq-only.</description>
+    </key>
+
+    <key name="popup-scale" type="s">
+      <default>'medium'</default>
+      <summary>Overall popup size scale</summary>
+      <description>Scale factor for popup dimensions: small, medium, or large.</description>
+    </key>
+
+    <key name="left-panel-width" type="i">
+      <default>310</default>
+      <range min="240" max="460"/>
+      <summary>Music &amp; Media panel width in pixels</summary>
+      <description>Width of the left Music &amp; Media panel in Dual Panel layout (or total width in Vertical/Music-Only layouts).</description>
+    </key>
+
+    <key name="right-panel-width" type="i">
+      <default>560</default>
+      <range min="420" max="780"/>
+      <summary>Equalizer panel width in pixels</summary>
+      <description>Width of the right Equalizer panel in Dual Panel layout (or total width in Equalizer-Only layout).</description>
+    </key>
+
+    <key name="show-album-art" type="b">
+      <default>true</default>
+      <summary>Show Album Art</summary>
+      <description>Whether to display the album cover artwork in the Music &amp; Media panel.</description>
+    </key>
+
+    <key name="show-media-source" type="b">
+      <default>true</default>
+      <summary>Show Media Source card</summary>
+      <description>Whether to display the Media Source &amp; Video/Audio stream information card at the bottom of the Music panel.</description>
+    </key>
+
+    <key name="show-bass-treble" type="b">
+      <default>true</default>
+      <summary>Show Bass &amp; Treble controls</summary>
+      <description>Whether to display the Bass and Treble shelf sliders below the 10-band Equalizer.</description>
+    </key>
+
+    <key name="show-time-info" type="b">
+      <default>true</default>
+      <summary>Show track elapsed and remaining time</summary>
+      <description>Whether to display the current time and remaining/total time labels under the progress bar.</description>
+    </key>
+
+    <key name="accent-color" type="s">
+      <default>'#257ef9'</default>
+      <summary>Accent color hex code</summary>
+      <description>Primary accent color for sliders, active buttons, and badges (e.g. #257ef9, #00c4cc, #8b5cf6, #10b981, #f59e0b, #ec4899).</description>
+    </key>
+
+    <key name="popup-opacity" type="i">
+      <default>65</default>
+      <range min="25" max="100"/>
+      <summary>Popup background opacity percentage</summary>
+      <description>Background opacity of the dark glassmorphic popup container (25% to 100%).</description>
+    </key>
+
+  </schema>
+</schemalist>
